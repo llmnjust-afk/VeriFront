@@ -69,3 +69,4 @@
 ## 修订记录
 
 - 2026-10-09 初始化仓库脚手架；实现 §10 模块结构与 §10.2 测试；Lab 环境探测结果记入 §6。
+- 2026-10-09 P0 进展：SAB pinned `c26e151`（verified 版确认 2026-04-30 发布）；HF verified split（102 任务）已存 Lab；SharePoint zip 需浏览器手动下载（禁止二次分发）。OpenHands 路线判定不可用：主仓已改 TypeScript 应用，`OpenHands/benchmarks`（`405bae7`）中 SAB 仅存于 unmaintained legacy（V0、docker 绑定），V1 无 SAB → **执行层采用 VeriFront 自研 CodeAct-lite，评测采用 SAB 官方 conda 路线**（`run_eval.py` 内置，偏差已登记）。详单见 `configs/environment.lock.yaml`。

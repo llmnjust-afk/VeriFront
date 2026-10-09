@@ -4,8 +4,9 @@ benchmark:
   name: ScienceAgentBench
   repo: https://github.com/OSU-NLP-Group/ScienceAgentBench
   variant: verified            # corrected false negatives per plan §3.1
-  commit: null                 # P0 TODO: pin verified-resource commit SHA
-  evaluation: docker           # WARNING: lab machine lacks Docker (2026-10-09 recon)
+  commit: c26e151ed601ba109dc4d35e057ff8e73fec469d  # pinned 2026-10-09 (repo head 2026-07-17)
+  evaluation: conda_fallback   # official docker harness impossible on this host (protocol §6);
+                               # official conda path (run_eval.py) used with per-task locks
   license: CC BY 4.0           # some tasks inherit source-repo licenses; verify per task
 backup:
   name: BixBench

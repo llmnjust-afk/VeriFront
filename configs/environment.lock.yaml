@@ -1,0 +1,54 @@
+# VeriFront environment lock (P0 artifact) — generated 2026-10-09
+# Purpose: pin every moving part so pilot runs are comparable and re-runnable.
+machine:
+  gpu: RTX 4090 24GB
+  driver: 570.172.08
+  cpu_cores: 96
+  ram_gb: 251
+  disk_gb: 256
+  os: Ubuntu 22.04.5 (containerized host; nested containers impossible — evidence in docs/protocol_pilot.md §6)
+repos:
+  sab:
+    path: /data/lab/sab
+    commit: c26e151ed601ba109dc4d35e057ff8e73fec469d
+    commit_date: 2026-07-17
+    notes: >
+      verified release dated 2026-04-30 (README). Inputs via HF 'verified' split
+      (102 tasks). Eval artifacts via SharePoint benchmark_verified.zip (password:
+      scienceagentbench) — requires manual browser download; DO NOT redistribute
+      unzipped files (SAB README constraint).
+  openhands_main:
+    path: /data/lab/openhands
+    commit: 553d4519113192a80fb18376fdb6c1e39fa06387
+    notes: current main is a TypeScript application; Python evaluation stack moved out. NOT used.
+  openhands_benchmarks:
+    path: /data/lab/openhands-benchmarks
+    commit: 405bae7140d7e961a75f4910a0b2e7069731db96
+    notes: >
+      SAB exists only under legacy/ (V0; imports openhands Python package internals;
+      docker-bound runtime; unmaintained). V1 benchmarks/ has NO scienceagentbench.
+      DECISION (P0): use the VeriFront-native CodeAct-lite execution layer;
+      revisit OpenHands only if the platform later provides Docker.
+envs:
+  sci-agent:
+    python: "3.10"
+    created_with: micromamba 2.9.0
+    requirements: /data/lab/sab/requirements.txt + pipreqs
+    status: installing (background job)
+data:
+  annotation_sheet_verified:
+    source: https://huggingface.co/datasets/osunlp/ScienceAgentBench (split=verified)
+    rows: 102
+    local_path: /data/lab/sab_data/annotation_sheet_verified.json
+    license_note: public input side; never commit to the repo
+  benchmark_verified_zip:
+    status: PENDING manual browser download (SharePoint requires an interactive session)
+    password: scienceagentbench
+    constraint: do not redistribute unzipped files online
+frontier_api:
+  key_source: FRONTIER_API_KEY from /data/lab/.verifront_env (0600; never logged, never committed)
+  provider: "TBD (P0: pick by availability / eval behavior / cost)"
+evaluation_route:
+  official_docker: UNAVAILABLE (evidence chain in docs/protocol_pilot.md §6)
+  fallback: SAB official conda path (run_eval.py config_conda_env) + per-task environment.lock
+  deviation_to_record: no container isolation; reproducibility guaranteed by pinned envs/commits
