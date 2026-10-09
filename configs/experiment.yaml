@@ -1,0 +1,42 @@
+# Pilot experiment parameters (Prompt_V2 §7). Ranges are exploratory engineering
+# guidance, NOT power-analysis requirements. Pre-register before P3 execution.
+version: p3-pilot
+seed: 20261009
+stages:
+  P0:
+    tasks: [3, 5]
+    goal: end-to-end run (frontier agent -> trajectory -> official eval) + measured cost table
+  P1:
+    trajectories: [20, 30]
+    recovery_anchors_min: 20
+    trial_annotation_steps: [50, 80]
+    kappa_target: 0.70
+  P2:
+    priority_step_types: [doc_parse_convert, tool_args, code_gen_repair, numeric_stats]
+    candidate_outputs: [80, 150]
+    notes: independent correctness labels; no AUROC without both label classes
+  P3:
+    tasks: [10, 20]
+    replacement_instances: [50, 100]
+    local_models: 2
+    treatment_reps: 1
+    control_reps: 1
+    mechanism_experiment: optional   # A: accept / B: check->retry / C: check->escalate
+  P4:
+    tasks: [25, 30]
+    replacement_instances: [200, 250]
+gates:
+  recovery_rate_pilot_min: 0.90
+  recovery_rate_formal_min: 0.95
+  kappa_min: 0.70
+  notes: >
+    Gates are engineering targets. Do NOT require p<0.05 on 50-100 instances to continue;
+    decide on effect direction, interpretability, precision, and research value (Prompt_V2 §8.3).
+budget:
+  frontier_token_cap_per_run: null   # P0 TODO: set after first measured trajectory
+  usd_cap_total: null
+  cost_accounting: full_continuation # include ALL post-replacement continuation, not just the step
+pre_registration:
+  sampling_config_path: reports/pilot/sampling_config.json
+  exclusion_log_path: reports/pilot/exclusions.json
+  notes: freeze sampling rules and analysis endpoints BEFORE P3; log all exclusions/failures

@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "verifront"
+version = "0.1.0"
+description = "Verifiability-driven counterfactual step-replacement experiments for scientific agents (pilot, P0-P4)"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+dependencies = [
+    "PyYAML>=5.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["verifront*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

@@ -1,0 +1,26 @@
+# Task sources & selection. P0 TODO fields are null until pinned on the lab machine.
+# License notes from Prompt_V2 §2.3: verify per-task source licenses before redistribution.
+benchmark:
+  name: ScienceAgentBench
+  repo: https://github.com/OSU-NLP-Group/ScienceAgentBench
+  variant: verified            # corrected false negatives per plan §3.1
+  commit: null                 # P0 TODO: pin verified-resource commit SHA
+  evaluation: docker           # WARNING: lab machine lacks Docker (2026-10-09 recon)
+  license: CC BY 4.0           # some tasks inherit source-repo licenses; verify per task
+backup:
+  name: BixBench
+  repo: https://github.com/Future-House/BixBench
+  license: Apache-2.0
+  use: robustness check / fallback if SAB integration fails
+tasks:
+  # P0 TODO: 3-5 smoke tasks with objective scoring and light dependencies.
+  # Rule (registered in advance): scientific criteria first (objective scoring,
+  # simple deps, recoverable state); image size is a secondary constraint and
+  # any size-driven exclusion MUST be recorded here to avoid selection bias.
+  selected: []                 # e.g. [SAB-xx, ...]
+  excluded_by_size: []         # {task_id, image_gb, reason}
+  split:
+    dev: []                    # development tasks (annotation/checker calibration)
+    eval: []                   # evaluation tasks; disjoint from dev BY TASK
+model_judge_tasks: []          # tasks whose scoring uses an LLM judge; flagged & handled separately
+environment_lock: null         # P0 TODO: path to environment.lock (repo commits, image digests, python/docker versions)

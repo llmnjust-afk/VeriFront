@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.venv/
+venv/
+
+# Secrets & credentials — never commit
+.env
+.env.*
+*.key
+*_pat*
+.verifront_pat*
+credentials*.json
+
+# Model weights & datasets (third-party licenses; do not redistribute)
+models/
+weights/
+data/
+*.safetensors
+*.gguf
+*.bin
+*.ckpt
+
+# Raw experiment artifacts too large or restricted for the public repo
+reports/pilot/raw/
+docker_bundles/
+task_images/
+*.tar
+*.tar.gz
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,37 @@
+# Model registry. API keys come ONLY from environment variables (never here).
+frontier:
+  provider: null               # P0 TODO: choose by availability / eval performance / API cost
+  model_id: null
+  snapshot: null               # REQUIRED once chosen; record the fixed snapshot, never a floating alias
+  base_url_env: FRONTIER_BASE_URL
+  api_key_env: FRONTIER_API_KEY
+  price_per_1m_usd:
+    prompt: null               # P0 TODO: from provider billing page
+    completion: null
+local:
+  - name: local-a
+    family: qwen               # placeholder family; pin exact release at P0
+    model_id: null             # P0 TODO: e.g. Qwen2.5-7B-Instruct (record HF revision hash)
+    hf_revision: null
+    precision: bf16
+    quantization: none         # bf16 preferred: quantization would confound ΔSR attribution
+    endpoint: http://127.0.0.1:8001/v1
+    api_key_env: null          # local vLLM typically needs none
+  - name: local-b
+    family: llama              # placeholder family; prefer cross-family vs local-a
+    model_id: null             # P0 TODO: e.g. Llama-3.1-8B-Instruct
+    hf_revision: null
+    precision: bf16
+    quantization: none
+    endpoint: http://127.0.0.1:8002/v1
+    api_key_env: null
+continuation:
+  policy: frontier             # P3 default: commercial frontier continues after the replaced step
+  open_weight_subexperiment: false  # if enabled later, MUST be reported as a separate labeled condition
+constraints:
+  # 24GB card: 7-8B bf16 weights ~14-16GB; KV cache at 32k ctx ~3-4GB => keep concurrency=1
+  local_max_context_tokens: 32768
+  local_max_concurrency: 1
+  notes: >
+    14B bf16 (~28GB) does NOT fit a single 24GB card; int4 fits but changes capability
+    (quantization confound) — on-site stress test required before any 14B use.
