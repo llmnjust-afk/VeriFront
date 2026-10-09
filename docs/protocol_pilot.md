@@ -54,7 +54,13 @@
 ## 6. 已知环境风险（Lab Compute 实测 2026-10-09）
 
 - RTX 4090 24GB、96 核、251GB 内存、磁盘 256GB（**低于方案 B 的 300–500GB**，见磁盘纪律）。
-- **Docker 缺失**：SAB 官方评测容器化。P0 须先实测可否获得容器运行时（或经管理员授权），否则转向 conda/venv 固定环境的替代评测路线并如实记录偏差。
+- **容器运行时不可用（已定性，含证据链；复测脚本 `scripts/docker_capability_check.sh`）**：
+  1. 宿主即容器：`/.dockerenv` 存在、cgroup 路径 `/docker/<id>`、PID 1 为 docker-init；
+  2. 能力集为 Docker 默认集，**无 `CAP_SYS_ADMIN`** → 特权式 DiD 不可行；
+  3. seccomp 过滤（mode 2）阻止 `unshare`（含 `CLONE_NEWUSER`）→ rootless Docker/Podman 不可行；
+  4. `/dev/fuse` 不存在 → rootless overlay 亦不可行；宿主 `docker.sock` 未挂载；
+  5. 实证：apt 安装 docker.io 29.1.3 后以 `--storage-driver=vfs --iptables=false --bridge=none` 启动 daemon 成功，但 `docker run hello-world` 在 `failed to register layer: unshare: operation not permitted` 处失败——镜像无法解包，任何容器均无法运行。
+- **P0 替代评测路线（协议允许的偏差，须记录）**：conda/venv 固定环境直接运行 SAB 任务与官方评测脚本，以 `environment.lock`（pip freeze + commit + 镜像/数据版本）逐任务锁版本；报告与论文 Limitations 中如实声明"未使用官方容器化评测，环境可复现性由锁文件保证"。若平台后续提供特权容器或挂载 `docker.sock`，恢复官方评测并重跑关键子集核对。
 
 ## 7. 预实验完成时必答的 10 个问题
 
