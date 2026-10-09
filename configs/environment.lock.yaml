@@ -33,8 +33,16 @@ envs:
   sci-agent:
     python: "3.10"
     created_with: micromamba 2.9.0
-    requirements: /data/lab/sab/requirements.txt + pipreqs
-    status: installing (background job)
+    requirements: >
+      minimal eval set: datasets==3.1.0, code_bert_score==0.4.1, tqdm==4.67.0, pipreqs,
+      torch (CPU index) for BERTScore.
+      DEVIATION RECORDED: sab/requirements.txt pins litellm==1.52.8, which no longer
+      exists on PyPI (yanked/purged; nearest live 1.53.1). The official eval path
+      (run_eval.py / compute_scores.py) imports only datasets + code_bert_score + tqdm
+      and no docker — agent-side deps (litellm/openai/swebench/docker_py) are NOT
+      needed for the conda-fallback evaluation route.
+    status: READY (imports verified 2026-10-09)
+    gpu_note: CPU torch intentionally; GPU torch/vLLM go into a separate serving env
 data:
   annotation_sheet_verified:
     source: https://huggingface.co/datasets/osunlp/ScienceAgentBench (split=verified)
