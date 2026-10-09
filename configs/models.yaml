@@ -1,12 +1,15 @@
 # Model registry. API keys come ONLY from environment variables (never here).
 frontier:
-  provider: null               # P0 TODO: choose by availability / eval performance / API cost
-  model_id: null
-  snapshot: null               # REQUIRED once chosen; record the fixed snapshot, never a floating alias
+  provider: ChatAnywhere relay (OpenAI-compatible; user-provided key)
+  model_id: gpt-5.5-2026-04-23     # dated snapshot, newest dated GPT-5.5 on relay (2026-10-09)
+  snapshot: gpt-5.5-2026-04-23
+  snapshot_fallback: gpt-5.2-2025-12-11
+  base_url: https://api.chatanywhere.org/v1   # overseas lab line; domestic alt: https://api.chatanywhere.tech/v1
   base_url_env: FRONTIER_BASE_URL
   api_key_env: FRONTIER_API_KEY
+  smoke_verified: "2026-10-09 gpt-4o-mini-2024-07-18 returned OK (13 tokens)"
   price_per_1m_usd:
-    prompt: null               # P0 TODO: from provider billing page
+    prompt: null                   # TBD: relay billing may differ from official; record from real usage
     completion: null
 local:
   - name: local-a

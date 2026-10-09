@@ -55,7 +55,10 @@ data:
     constraint: do not redistribute unzipped files online
 frontier_api:
   key_source: FRONTIER_API_KEY from /data/lab/.verifront_env (0600; never logged, never committed)
-  provider: "TBD (P0: pick by availability / eval behavior / cost)"
+  provider: "ChatAnywhere relay — api.chatanywhere.org/v1 (overseas line, verified 2026-10-09); domestic alt api.chatanywhere.tech/v1"
+  smoke_test: "gpt-4o-mini-2024-07-18 chat OK, 13 tokens"
+  frontier_snapshot: "gpt-5.5-2026-04-23 (fallback gpt-5.2-2025-12-11)"
+  models_available: 149 (dated snapshots for gpt/claude/gemini/deepseek/qwen/glm/kimi families)
 evaluation_route:
   official_docker: UNAVAILABLE (evidence chain in docs/protocol_pilot.md §6)
   fallback: SAB official conda path (run_eval.py config_conda_env) + per-task environment.lock
