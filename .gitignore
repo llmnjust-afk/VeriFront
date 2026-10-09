@@ -36,3 +36,4 @@ task_images/
 .DS_Store
 .idea/
 .vscode/
+runs/
