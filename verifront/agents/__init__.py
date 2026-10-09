@@ -8,6 +8,7 @@ from .base import (
 )
 from .openai_compat import OpenAICompatClient
 from .openhands_adapter import map_openhands_events
+from .codeact import CodeActAgent, CodeActConfig, TaskSpec, parse_action
 
 __all__ = [
     "ContinuationOutcome",
@@ -16,4 +17,8 @@ __all__ = [
     "load_models_config",
     "OpenAICompatClient",
     "map_openhands_events",
+    "CodeActAgent",
+    "CodeActConfig",
+    "TaskSpec",
+    "parse_action",
 ]

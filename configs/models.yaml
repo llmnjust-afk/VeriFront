@@ -13,9 +13,9 @@ frontier:
     completion: null
 local:
   - name: local-a
-    family: qwen               # placeholder family; pin exact release at P0
-    model_id: null             # P0 TODO: e.g. Qwen2.5-7B-Instruct (record HF revision hash)
-    hf_revision: null
+    family: qwen3                 # newest permissive 7-8B class (2026-10-09 HF survey)
+    model_id: Qwen/Qwen3-8B
+    hf_revision: b968826d9c46dd6066d109eabc6255188de91218   # main @ 2025-07-26
     precision: bf16
     quantization: none         # bf16 preferred: quantization would confound ΔSR attribution
     endpoint: http://127.0.0.1:8001/v1

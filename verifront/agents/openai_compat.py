@@ -32,9 +32,11 @@ class OpenAICompatClient:
         timeout_s: float = 120.0,
         max_retries: int = 2,
         backoff_s: float = 2.0,
+        snapshot: str = "",
     ):
         self.base_url = base_url.rstrip("/")
         self.model = model
+        self.snapshot = snapshot
         self.timeout_s = timeout_s
         self.max_retries = max_retries
         self.backoff_s = backoff_s
