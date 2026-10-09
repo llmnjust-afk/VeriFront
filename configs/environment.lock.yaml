@@ -43,6 +43,25 @@ envs:
       needed for the conda-fallback evaluation route.
     status: READY (imports verified 2026-10-09)
     gpu_note: CPU torch intentionally; GPU torch/vLLM go into a separate serving env
+  serve2:
+    python: "3.12"
+    purpose: local-model serving (vLLM)
+    stack: "vllm==0.13.0 + torch==2.9.0+cu128 + flashinfer(-cubin)==0.5.3, CUDA 12.8"
+    status: READY — server up on :8001, chat smoke OK, 23.4GB/24.5GB VRAM at util=0.92
+    driver_constraint: >
+      host driver 570.172.08 = CUDA 12.8 ONLY. Newer stacks fail: vllm 0.31.0
+      (torch 2.13+cu130) and vllm 0.24.0 PyPI wheels (built against cu13) cannot
+      run here. Any future env upgrade must pin to cu12x<=128 wheels.
+    notes: >
+      Qwen3-8B replies in thinking mode by default; disable via
+      chat_template_kwargs {"enable_thinking": false} (or /no_think) for the
+      deterministic-eval configuration; must be recorded as sampling_config.
+models:
+  weights:
+    qwen3-8b:
+      repo: Qwen/Qwen3-8B
+      revision: "b968826d9c46dd6066d109eabc6255188de91218 (main @ 2025-07-26)"
+      local_path: /data/lab/models/Qwen3-8B (16GB bf16; HF verified 2026-10-09)
 data:
   annotation_sheet_verified:
     source: https://huggingface.co/datasets/osunlp/ScienceAgentBench (split=verified)
@@ -59,6 +78,9 @@ frontier_api:
   smoke_test: "gpt-4o-mini-2024-07-18 chat OK, 13 tokens"
   frontier_snapshot: "gpt-5.5-2026-04-23 (fallback gpt-5.2-2025-12-11)"
   models_available: 149 (dated snapshots for gpt/claude/gemini/deepseek/qwen/glm/kimi families)
+  waf_note: >
+    relay blocks the Python-urllib User-Agent (Cloudflare error 1010, HTTP 403);
+    OpenAICompatClient sends a browser UA header — do not remove it.
 evaluation_route:
   official_docker: UNAVAILABLE (evidence chain in docs/protocol_pilot.md §6)
   fallback: SAB official conda path (run_eval.py config_conda_env) + per-task environment.lock
