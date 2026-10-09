@@ -1,0 +1,28 @@
+{
+  "run_id": "demo-smoke-1791536407",
+  "task_id": "demo-smoke",
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "status": "completed",
+  "final_answer": "Computed the sum of squares of integers 1..10.\n\nResult: 385",
+  "token_usage": {
+    "prompt": 485,
+    "completion": 61
+  },
+  "wall_s": 3.433,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 2,
+      "kind": "final"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

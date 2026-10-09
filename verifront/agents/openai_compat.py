@@ -33,10 +33,15 @@ class OpenAICompatClient:
         max_retries: int = 2,
         backoff_s: float = 2.0,
         snapshot: str = "",
+        user_agent: str = (
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/126.0.0.0 Safari/537.36"
+        ),
     ):
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.snapshot = snapshot
+        self.user_agent = user_agent
         self.timeout_s = timeout_s
         self.max_retries = max_retries
         self.backoff_s = backoff_s
@@ -60,7 +65,7 @@ class OpenAICompatClient:
         }
         if seed is not None:
             body["seed"] = seed
-        headers = {"Content-Type": "application/json"}
+        headers = {"Content-Type": "application/json", "User-Agent": self.user_agent}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
 
@@ -78,14 +83,27 @@ class OpenAICompatClient:
                     payload = json.loads(resp.read().decode("utf-8"))
                 latency = time.monotonic() - start
                 usage = payload.get("usage") or {}
+                details = usage.get("completion_tokens_details") or {}
                 choice = (payload.get("choices") or [{}])[0]
                 message = choice.get("message") or {}
+                content = message.get("content")
+                finish = choice.get("finish_reason")
+                if not content and finish == "length":
+                    raise ChatError(
+                        "empty content with finish_reason=length: the model spent the "
+                        "entire token budget on reasoning; increase max_tokens"
+                    )
+                token_usage = {
+                    "prompt": int(usage.get("prompt_tokens", 0)),
+                    "completion": int(usage.get("completion_tokens", 0)),
+                }
+                reasoning = int(details.get("reasoning_tokens") or 0)
+                if reasoning:
+                    token_usage["reasoning"] = reasoning
                 return {
-                    "content": message.get("content"),
-                    "token_usage": {
-                        "prompt": int(usage.get("prompt_tokens", 0)),
-                        "completion": int(usage.get("completion_tokens", 0)),
-                    },
+                    "content": content,
+                    "finish_reason": finish,
+                    "token_usage": token_usage,
                     "model": payload.get("model", self.model),
                     "latency_s": latency,
                     "raw": payload,

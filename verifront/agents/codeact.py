@@ -76,7 +76,7 @@ class CodeActConfig:
     max_steps: int = 6
     step_timeout_s: float = 300.0
     total_wall_s: float = 1800.0
-    max_tokens: int = 2048
+    max_tokens: int = 8192  # reasoning models spend this budget on thinking + code
     temperature: float = 0.0
     seed: Optional[int] = None
     obs_char_limit: int = 4000

@@ -50,6 +50,7 @@ def main() -> int:
     ap.add_argument("--workdir", default=str(ROOT / "runs"))
     ap.add_argument("--max-steps", type=int, default=6)
     ap.add_argument("--step-timeout", type=float, default=300.0)
+    ap.add_argument("--max-tokens", type=int, default=8192)
     ap.add_argument("--python-bin", default=sys.executable)
     args = ap.parse_args()
 
@@ -61,12 +62,14 @@ def main() -> int:
     conf = CodeActConfig(
         max_steps=args.max_steps,
         step_timeout_s=args.step_timeout,
+        max_tokens=args.max_tokens,
         python_bin=args.python_bin,
     )
 
     agent = CodeActAgent(client, conf, workdir=Path(args.workdir) / args.task_id / args.arm,
                          agent_commit=git_commit())
     result = agent.run(task)
+    assert result.trajectory is not None
 
     out_dir = Path(args.workdir) / args.task_id / args.arm / f"{int(time.time())}"
     out_dir.mkdir(parents=True, exist_ok=True)
