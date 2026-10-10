@@ -1,0 +1,28 @@
+# P1 task pool — frozen 2026-10-10 (12 new tasks; P0 five already at the frozen
+# 12-step budget). Selection criteria: objective eval (all verified tasks),
+# bounded dep superset, small datasets, domain spread.
+# Each task runs 2x with configs/sampling_p1.yaml -> 24 new + 5 existing = 29 trajectories.
+
+pool:
+  - {instance_id: 24, domain: "Psychology and Cognitive science", gold: ecg_processing_vis1.py,  deps: biopsykit}
+  - {instance_id: 37, domain: "Psychology and Cognitive science", gold: cft.py,                  deps: biopsykit}
+  - {instance_id: 42, domain: "Psychology and Cognitive science", gold: EDR_analyze.py,          deps: neurokit2}
+  - {instance_id: 44, domain: "Psychology and Cognitive science", gold: imu.py,                  deps: biopsykit}
+  - {instance_id: 59, domain: "Psychology and Cognitive science", gold: nvc_heatmap.py,          deps: "ccobra,seaborn"}
+  - {instance_id: 63, domain: "Psychology and Cognitive science", gold: bio_interval_analyze.py, deps: neurokit2}
+  - {instance_id: 92, domain: "Psychology and Cognitive science", gold: h_importances.py,        deps: numpy}
+  - {instance_id: 77, domain: "Geographical Information Science", gold: WaterQuality.py,         deps: "geopandas,shapely"}
+  - {instance_id: 10, domain: "Geographical Information Science", gold: toronto_new.py,          deps: geopandas}
+  - {instance_id: 79, domain: "Bioinformatics",                   gold: violin.py,               deps: "scanpy,anndata"}
+  - {instance_id: 96, domain: "Bioinformatics",                   gold: scatter.py,              deps: "scanpy,anndata"}
+  - {instance_id: 94, domain: "Computational Chemistry",          gold: polyverse_visualize_molecules.py, deps: networkx}
+
+excluded_this_phase:
+  - {instance_id: 26, reason: "MDAnalysis+prolif: dep superset violation"}
+  - {instance_id: 17, reason: "qsprpred+scaffviz: heavy install chain"}
+  - {instance_id: 71, reason: "torch required: violates lightweight P1 rule"}
+  - {instance_id: 89, reason: "geoplot pulls cartopy (native GEOS); revisit via micromamba if needed"}
+  - {instance_id: 3,  reason: "matminer chain (pymatgen): deferred"}
+  - {instance_id: 9,  reason: "deepchem: heavy + TF-adjacent"}
+
+env_additions_testbed: [geopandas, shapely, scanpy, anndata, networkx]

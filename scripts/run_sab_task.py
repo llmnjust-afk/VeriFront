@@ -56,7 +56,8 @@ def main() -> int:
     ap.add_argument("--benchmark-root", default=str(BENCHMARK_ROOT_DEFAULT))
     ap.add_argument("--workdir-root", default=str(ROOT / "runs"))
     ap.add_argument("--python-bin", default=PYTHON_BIN_DEFAULT)
-    ap.add_argument("--max-steps", type=int, default=6)
+    ap.add_argument("--max-steps", type=int, default=12,
+                    help="frozen P1 budget (configs/sampling_p1.yaml)")
     ap.add_argument("--step-timeout", type=float, default=300.0)
     ap.add_argument("--max-tokens", type=int, default=8192)
     args = ap.parse_args()
