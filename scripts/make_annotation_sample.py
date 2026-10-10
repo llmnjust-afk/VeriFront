@@ -21,9 +21,9 @@ ROOT = Path(__file__).resolve().parents[1]
 RUNS = ROOT / "runs"
 OUT = ROOT / "reports/annotation/annotation_sample.jsonl"
 
-STABLE_PASS = {45, 87, 35, 37, 53, 58}
-STABLE_FAIL = {34, 60, 18, 44}
-FLAKY = {29, 5, 40, 67, 85, 92}
+STABLE_PASS = {18, 37, 40, 45, 53, 58, 67, 85}
+STABLE_FAIL = {34, 35, 44, 60, 87, 92}
+FLAKY = {5, 29}
 
 SIG = {
     "data_inspection": r"\.head\(|\.columns|listdir|glob\.|\.shape|print.*shape|glob.glob",
