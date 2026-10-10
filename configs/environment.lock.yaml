@@ -56,6 +56,43 @@ envs:
       shared testbed unconditionally; P0 task set (29/34/45/60/87) needs none, so
       they are omitted (recorded per protocol §4.6 version discipline).
     status: READY — gold programs of ALL 5 P0 tasks reproduce and eval PASS (2026-10-10)
+    hybrid_resolution_correction: >
+      CORRECTION (2026-10-10, discovered while building the nobody sandbox): the env
+      is a HYBRID for root — user-site (/root/.local/lib/python3.10/site-packages)
+      shadows env site-packages. De-facto import versions during the original gold
+      verification runs were numpy 1.26.4, pandas 2.3.3, matplotlib 3.7.5,
+      scipy 1.13.1, pyarrow 25.0.1 — NOT the pandas 1.5.3 recorded above. Root cause:
+      pip run as root installs into user-site (pip config quirk), not env
+      site-packages; pinned 1.5.3 landed there but was shadowed by the later 2.3.3
+      user-site install. The user-site dir is the de-facto interpreter state for
+      root AND the sandboxed agent (PYTHONPATH pins it for nobody; identical
+      resolution verified). The biopsykit==0.9.0 gold reproduction was therefore
+      validated under pandas 2.3.3 all along.
+sandbox:
+  mechanism: >
+    nobody privilege drop (mount namespaces unavailable in this container: unshare -m
+    fails; user namespaces disabled — evidence in docs/protocol_pilot.md §6)
+  workdir: >
+    /tmp/vf_w/sab_<id>/<arm>/<uuid12>/wd — OUTSIDE /data/lab; unguessable uuid;
+    traverse-only parents (0711); workdir chowned to nobody:nogroup during the agent
+    phase; deleted after artifact copy-back (serial batches => no readable siblings)
+  agent_view: >
+    REAL copies of the task's dataset dirs at the workdir root (official SAB layout,
+    e.g. ./dkpes/); NO benchmark/ tree exists during the agent phase; the eval phase
+    swaps the full benchmark tree in as root AFTER agent steps finish
+  host_lockdown: /data/lab 0750 root:root (nobody not in group), /root 0711
+  env_allowlist: >
+    PATH, HOME, LANG, LC_ALL, TMPDIR, TERM, CONDA_PREFIX — FRONTIER_API_KEY and repo
+    paths are stripped; PYTHONPATH pins the user-site for nobody
+  supplementary_group_note: >
+    subprocess(user=65534) alone does NOT clear supplementary groups — the child kept
+    group root and could still list /data/lab (caught by the sandbox probe test,
+    2026-10-10); preexec_fn now performs setgroups([]) + setgid + setuid.
+  e2e_probe: >
+    tests/test_sab_adapter.py::test_end_to_end_sandboxed_step asserts euid==65534,
+    FRONTIER_API_KEY absent, /data/lab unreadable (PermissionError on listdir), and a
+    clean agent view. os.path.exists('/data/lab') is True even for nobody (stat needs
+    no permission on the target) — readability, not existence, is the correct check.
 serve2_env:
   python: "3.12"
   purpose: local-model serving (vLLM)
