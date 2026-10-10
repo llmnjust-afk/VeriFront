@@ -90,7 +90,7 @@ def test_end_to_end_toy_task(mini_benchmark, tmp_path):
     ev = run_eval(paths, "eval_toy.py", "python3")
     assert ev["success"] == 1, ev
     assert ev["detail"] == "1 / 1"
-    assert run.trajectory.validate() == []
+    assert run.trajectory is not None and run.trajectory.validate() == []
 
 
 def test_eval_missing_script_raises(mini_benchmark, tmp_path):

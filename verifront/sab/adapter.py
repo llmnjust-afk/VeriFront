@@ -116,6 +116,8 @@ def run_eval(paths: SabTaskPaths, eval_script_name: str, python_bin: str,
         if parsed:
             parsed_success, detail = parsed
             break
+    if parsed_success is None and proc.returncode != 0:
+        parsed_success, detail = 0, "eval_crash (no verdict line; see stdout/stderr tails)"
     return {
         "success": parsed_success,
         "detail": detail,

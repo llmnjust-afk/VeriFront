@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
@@ -66,7 +67,7 @@ def main() -> int:
     eval_script = str(row["eval_script_name"])
 
     task_dir = Path(args.workdir_root) / f"sab_{args.instance_id}" / args.arm
-    stamp = str(int(time.time()))
+    stamp = f"{int(time.time())}-{os.getpid()}"
     paths = SabTaskPaths(
         benchmark_root=Path(args.benchmark_root),
         workdir=task_dir / stamp,
@@ -96,6 +97,9 @@ def main() -> int:
         "status": run.status,
         "eval_success": ev["success"],
         "eval_detail": ev["detail"],
+        "eval_returncode": ev["returncode"],
+        "eval_stdout_tail": ev["stdout_tail"][-500:],
+        "eval_stderr_tail": ev["stderr_tail"][-500:],
         "final_answer": run.final_answer,
         "token_usage": run.token_usage,
         "wall_s": run.wall_s,

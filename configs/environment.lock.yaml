@@ -1,8 +1,8 @@
-# VeriFront environment lock (P0 artifact) — generated 2026-10-09
+# VeriFront environment lock (P0 artifact) — generated 2026-10-09, updated 2026-10-10
 # Purpose: pin every moving part so pilot runs are comparable and re-runnable.
 machine:
   gpu: RTX 4090 24GB
-  driver: 570.172.08
+  driver: 595.91.07   # instance recreated 2026-10-10; previous pod was 570.172.08 (CUDA 12.8)
   cpu_cores: 96
   ram_gb: 251
   disk_gb: 256
@@ -10,6 +10,8 @@ machine:
 repos:
   sab:
     path: /data/lab/sab
+    url: https://github.com/OSU-NLP-Group/ScienceAgentBench.git
+    url_note: repo moved from osunlp/ to OSU-NLP-Group/ (discovered 2026-10-10; old path 404)
     commit: c26e151ed601ba109dc4d35e057ff8e73fec469d
     commit_date: 2026-07-17
     notes: >
@@ -41,21 +43,34 @@ envs:
       (run_eval.py / compute_scores.py) imports only datasets + code_bert_score + tqdm
       and no docker — agent-side deps (litellm/openai/swebench/docker_py) are NOT
       needed for the conda-fallback evaluation route.
-    status: READY (imports verified 2026-10-09)
+    status: READY (imports verified 2026-10-10)
     gpu_note: CPU torch intentionally; GPU torch/vLLM go into a separate serving env
-  serve2:
-    python: "3.12"
-    purpose: local-model serving (vLLM)
-    stack: "vllm==0.13.0 + torch==2.9.0+cu128 + flashinfer(-cubin)==0.5.3, CUDA 12.8"
-    status: READY — server up on :8001, chat smoke OK, 23.4GB/24.5GB VRAM at util=0.92
-    driver_constraint: >
-      host driver 570.172.08 = CUDA 12.8 ONLY. Newer stacks fail: vllm 0.31.0
-      (torch 2.13+cu130) and vllm 0.24.0 PyPI wheels (built against cu13) cannot
-      run here. Any future env upgrade must pin to cu12x<=128 wheels.
-    notes: >
-      Qwen3-8B replies in thinking mode by default; disable via
-      chat_template_kwargs {"enable_thinking": false} (or /no_think) for the
-      deterministic-eval configuration; must be recorded as sampling_config.
+  testbed:
+    python: "3.10"
+    purpose: SAB task execution + official eval (5-task P0 set)
+    stack: >
+      micromamba 2.9.0; numpy 1.26.4 (<2.0), pandas 1.5.3 (<=1.5.3), scipy<1.14.0,
+      matplotlib<3.8.0 (official config_conda_env caps), neurokit2, biopsykit+mne,
+      ccobra, scitools-iris+xxhash<3+cftime+netCDF4+xarray, scikit-learn, pipreqs.
+      DEVIATION: official policy installs torch/tensorflow/rdkit/tf_keras into the
+      shared testbed unconditionally; P0 task set (29/34/45/60/87) needs none, so
+      they are omitted (recorded per protocol §4.6 version discipline).
+    status: READY — gold programs of ALL 5 P0 tasks reproduce and eval PASS (2026-10-10)
+serve2_env:
+  python: "3.12"
+  purpose: local-model serving (vLLM)
+  stack: "vllm==0.13.0 + torch==2.9.0+cu128 + flashinfer(-cubin)==0.5.3, CUDA 12.8"
+  status: REBUILD PENDING (instance reset 2026-10-10 wiped envs+weights; weights re-downloading)
+  compat_note: >
+    On the OLD pod (driver 570.172.08 = CUDA 12.8) newer stacks failed: vllm 0.31.0
+    (torch 2.13+cu130) and vllm 0.24.0 PyPI wheels (built against cu13). The pinned
+    0.13.0+cu128 stack also runs on the new driver (backwards compatible); if the
+    platform keeps driver 595 (CUDA 13), cu130 stacks become viable again — verify
+    before any upgrade.
+  notes: >
+    Qwen3-8B replies in thinking mode by default; disable via
+    chat_template_kwargs {"enable_thinking": false} (or /no_think) for the
+    deterministic-eval configuration; must be recorded as sampling_config.
 models:
   weights:
     qwen3-8b:
@@ -63,15 +78,27 @@ models:
       revision: "b968826d9c46dd6066d109eabc6255188de91218 (main @ 2025-07-26)"
       local_path: /data/lab/models/Qwen3-8B (16GB bf16; HF verified 2026-10-09)
 data:
+  verified_parquet:
+    source: https://huggingface.co/datasets/osunlp/ScienceAgentBench data/verified-00000-of-00001.parquet
+    rows: 102
+    local_path: /data/lab/sab_data/verified.parquet
   annotation_sheet_verified:
     source: https://huggingface.co/datasets/osunlp/ScienceAgentBench (split=verified)
     rows: 102
-    local_path: /data/lab/sab_data/annotation_sheet_verified.json
+    local_path: /data/lab/sab_data/verified.parquet (canonical; older annotation_sheet_verified.json lost with the 2026-10-10 instance reset)
     license_note: public input side; never commit to the repo
   benchmark_verified_zip:
-    status: PENDING manual browser download (SharePoint requires an interactive session)
+    status: ACQUIRED via user's HF mirror (xd0127/agent_data) 2026-10-10; unzipped at
+      /data/lab/sab_data/benchmark_verified/ (1.7GB zip; 845 files)
     password: scienceagentbench
-    constraint: do not redistribute unzipped files online
+    constraint: do not redistribute unzipped files online; never commit to the repo
+    operational_notes:
+      - unzipped tree lacks __init__.py; add empty ones locally so `benchmark.*` imports
+        work, EXCLUDING dirs that gold programs traverse via os.listdir (e.g.
+        datasets/nvc/scripts/prediction_errors/models/)
+      - gold programs with package imports run as `python -m benchmark.gold_programs.<name>`
+        from the run workdir; eval scripts run directly with cwd=workdir
+      - scitools-iris needs xxhash<3 (xxhash 3.x removed the string-encoding default)
 frontier_api:
   key_source: FRONTIER_API_KEY from /data/lab/.verifront_env (0600; never logged, never committed)
   provider: "ChatAnywhere relay — api.chatanywhere.org/v1 (overseas line, verified 2026-10-09); domestic alt api.chatanywhere.tech/v1"
