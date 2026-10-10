@@ -8,9 +8,14 @@ frontier:
   base_url_env: FRONTIER_BASE_URL
   api_key_env: FRONTIER_API_KEY
   smoke_verified: "2026-10-09 gpt-4o-mini-2024-07-18 returned OK (13 tokens)"
-  price_per_1m_usd:
-    prompt: null                   # TBD: relay billing may differ from official; record from real usage
-    completion: null
+  price:
+    # ChatAnywhere price list 2026-10-10 (chatanywhere.tech/pricing; unit CA ≈ RMB):
+    # gpt-5.5 ladder 0-272K: 0.035 CA/1K in, 0.21 CA/1K out -> ¥35 in / ¥210 out per 1M
+    # USD at ~7.15 RMB/USD (assumption). Group caveat: rates = default group;
+    # discount group (gpt-5.5-ca) = 0.02/0.12 CA per 1K. Key's group TBD from user backend.
+    per_1m_ca: {prompt: 35, completion: 210}
+    per_1m_usd: {prompt: 4.90, completion: 29.37}
+    ladder_threshold_tokens: 272000
 local:
   - name: local-a
     family: qwen3                 # newest permissive 7-8B class (2026-10-09 HF survey)

@@ -105,9 +105,21 @@ frontier_api:
   smoke_test: "gpt-4o-mini-2024-07-18 chat OK, 13 tokens"
   frontier_snapshot: "gpt-5.5-2026-04-23 (fallback gpt-5.2-2025-12-11)"
   models_available: 149 (dated snapshots for gpt/claude/gemini/deepseek/qwen/glm/kimi families)
+  pricing: >
+    gpt-5.5 default group, 0-272K ladder: 0.035 CA(=RMB)/1K input, 0.21/1K output
+    (chatanywhere.tech/pricing, 2026-10-10). Discount group gpt-5.5-ca = 0.02/0.12.
+    Key's group assignment TBD (user backend). Billing uses provider-returned usage.
   waf_note: >
     relay blocks the Python-urllib User-Agent (Cloudflare error 1010, HTTP 403);
     OpenAICompatClient sends a browser UA header — do not remove it.
+y_definition:
+  judge_correction: >
+    69/111 verified eval programs import gpt4_visual_judge (GPT-4V judge) —
+    visualization tasks are JUDGE-scored. Objective set = 38 tasks (determined by
+    grepping eval-script CONTENT, not filenames). All protocol runs use objective
+    tasks only; judge-eval runs are labeled separately and excluded from Y.
+  pool: configs/tasks_p1_pool.yaml (16 objective tasks; all gold programs reproduce;
+    biopsykit pinned to 0.9.0 — 0.10.x breaks gold under pandas 1.5.3)
 evaluation_route:
   official_docker: UNAVAILABLE (evidence chain in docs/protocol_pilot.md §6)
   fallback: SAB official conda path (run_eval.py config_conda_env) + per-task environment.lock
