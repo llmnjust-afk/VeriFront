@@ -1,0 +1,614 @@
+{
+  "summary": {
+    "n_points": 38,
+    "n_ready": 38,
+    "roles": {
+      "critical_success": 16,
+      "neutral": 11,
+      "critical_failure": 11
+    },
+    "planned_runs": 152,
+    "by_task": {
+      "5": 2,
+      "18": 4,
+      "34": 3,
+      "35": 2,
+      "37": 4,
+      "40": 3,
+      "44": 3,
+      "45": 1,
+      "53": 1,
+      "58": 2,
+      "60": 5,
+      "67": 4,
+      "85": 3,
+      "92": 1
+    }
+  },
+  "points": [
+    {
+      "sample_idx": 1,
+      "task_id": "37",
+      "step_idx": "step_10",
+      "step_no": 10,
+      "role": "critical_success",
+      "step_type": "fix_rerun",
+      "run_outcome": "success",
+      "stratum": "stable_pass",
+      "parent_stamp": "1791614063-319742",
+      "parent_run": "runs/sab_37/frontier/1791614063-319742",
+      "ready": true
+    },
+    {
+      "sample_idx": 2,
+      "task_id": "37",
+      "step_idx": "step_02",
+      "step_no": 2,
+      "role": "neutral",
+      "step_type": "data_inspection",
+      "run_outcome": "success",
+      "stratum": "stable_pass",
+      "parent_stamp": "1791614063-319742",
+      "parent_run": "runs/sab_37/frontier/1791614063-319742",
+      "ready": true
+    },
+    {
+      "sample_idx": 3,
+      "task_id": "60",
+      "step_idx": "step_04",
+      "step_no": 4,
+      "role": "critical_success",
+      "step_type": "data_inspection",
+      "run_outcome": "success",
+      "stratum": "stable_pass",
+      "parent_stamp": "1791614180-321913",
+      "parent_run": "runs/sab_60/frontier/1791614180-321913",
+      "ready": true
+    },
+    {
+      "sample_idx": 4,
+      "task_id": "18",
+      "step_idx": "step_02",
+      "step_no": 2,
+      "role": "critical_success",
+      "step_type": "data_inspection",
+      "run_outcome": "success",
+      "stratum": "stable_pass",
+      "parent_stamp": "1791614252-322475",
+      "parent_run": "runs/sab_18/frontier/1791614252-322475",
+      "ready": true
+    },
+    {
+      "sample_idx": 5,
+      "task_id": "60",
+      "step_idx": "step_08",
+      "step_no": 8,
+      "role": "critical_success",
+      "step_type": "compute_run",
+      "run_outcome": "success",
+      "stratum": "stable_pass",
+      "parent_stamp": "1791614180-321913",
+      "parent_run": "runs/sab_60/frontier/1791614180-321913",
+      "ready": true
+    },
+    {
+      "sample_idx": 8,
+      "task_id": "53",
+      "step_idx": "step_01",
+      "step_no": 1,
+      "role": "critical_success",
+      "step_type": "data_prep",
+      "run_outcome": "success",
+      "stratum": "stable_pass",
+      "parent_stamp": "1791612802-278586",
+      "parent_run": "runs/sab_53/frontier/1791612802-278586",
+      "ready": true
+    },
+    {
+      "sample_idx": 9,
+      "task_id": "37",
+      "step_idx": "step_08",
+      "step_no": 8,
+      "role": "critical_success",
+      "step_type": "data_inspection",
+      "run_outcome": "success",
+      "stratum": "stable_pass",
+      "parent_stamp": "1791614063-319742",
+      "parent_run": "runs/sab_37/frontier/1791614063-319742",
+      "ready": true
+    },
+    {
+      "sample_idx": 10,
+      "task_id": "92",
+      "step_idx": "step_01",
+      "step_no": 1,
+      "role": "critical_success",
+      "step_type": "compute_run",
+      "run_outcome": "success",
+      "stratum": "stable_pass",
+      "parent_stamp": "1791614994-362003",
+      "parent_run": "runs/sab_92/frontier/1791614994-362003",
+      "ready": true
+    },
+    {
+      "sample_idx": 11,
+      "task_id": "85",
+      "step_idx": "step_01",
+      "step_no": 1,
+      "role": "neutral",
+      "step_type": "data_inspection",
+      "run_outcome": "success",
+      "stratum": "stable_pass",
+      "parent_stamp": "1791613931-318581",
+      "parent_run": "runs/sab_85/frontier/1791613931-318581",
+      "ready": true
+    },
+    {
+      "sample_idx": 12,
+      "task_id": "60",
+      "step_idx": "step_02",
+      "step_no": 2,
+      "role": "neutral",
+      "step_type": "data_inspection",
+      "run_outcome": "success",
+      "stratum": "stable_pass",
+      "parent_stamp": "1791614180-321913",
+      "parent_run": "runs/sab_60/frontier/1791614180-321913",
+      "ready": true
+    },
+    {
+      "sample_idx": 16,
+      "task_id": "60",
+      "step_idx": "step_03",
+      "step_no": 3,
+      "role": "critical_success",
+      "step_type": "data_inspection",
+      "run_outcome": "success",
+      "stratum": "stable_pass",
+      "parent_stamp": "1791612902-279436",
+      "parent_run": "runs/sab_60/frontier/1791612902-279436",
+      "ready": true
+    },
+    {
+      "sample_idx": 17,
+      "task_id": "18",
+      "step_idx": "step_01",
+      "step_no": 1,
+      "role": "critical_success",
+      "step_type": "compute_run",
+      "run_outcome": "success",
+      "stratum": "stable_pass",
+      "parent_stamp": "1791613049-280338",
+      "parent_run": "runs/sab_18/frontier/1791613049-280338",
+      "ready": true
+    },
+    {
+      "sample_idx": 18,
+      "task_id": "60",
+      "step_idx": "step_06",
+      "step_no": 6,
+      "role": "critical_success",
+      "step_type": "method_design",
+      "run_outcome": "success",
+      "stratum": "stable_pass",
+      "parent_stamp": "1791612902-279436",
+      "parent_run": "runs/sab_60/frontier/1791612902-279436",
+      "ready": true
+    },
+    {
+      "sample_idx": 25,
+      "task_id": "37",
+      "step_idx": "step_05",
+      "step_no": 5,
+      "role": "critical_success",
+      "step_type": "data_inspection",
+      "run_outcome": "success",
+      "stratum": "stable_pass",
+      "parent_stamp": "1791612745-277512",
+      "parent_run": "runs/sab_37/frontier/1791612745-277512",
+      "ready": true
+    },
+    {
+      "sample_idx": 27,
+      "task_id": "18",
+      "step_idx": "step_03",
+      "step_no": 3,
+      "role": "critical_success",
+      "step_type": "compute_run",
+      "run_outcome": "success",
+      "stratum": "stable_pass",
+      "parent_stamp": "1791614252-322475",
+      "parent_run": "runs/sab_18/frontier/1791614252-322475",
+      "ready": true
+    },
+    {
+      "sample_idx": 28,
+      "task_id": "45",
+      "step_idx": "step_01",
+      "step_no": 1,
+      "role": "critical_success",
+      "step_type": "compute_run",
+      "run_outcome": "success",
+      "stratum": "stable_pass",
+      "parent_stamp": "1791613957-319021",
+      "parent_run": "runs/sab_45/frontier/1791613957-319021",
+      "ready": true
+    },
+    {
+      "sample_idx": 29,
+      "task_id": "85",
+      "step_idx": "step_01",
+      "step_no": 1,
+      "role": "critical_success",
+      "step_type": "data_inspection",
+      "run_outcome": "success",
+      "stratum": "stable_pass",
+      "parent_stamp": "1791614969-361789",
+      "parent_run": "runs/sab_85/frontier/1791614969-361789",
+      "ready": true
+    },
+    {
+      "sample_idx": 30,
+      "task_id": "85",
+      "step_idx": "step_02",
+      "step_no": 2,
+      "role": "critical_success",
+      "step_type": "compute_run",
+      "run_outcome": "success",
+      "stratum": "stable_pass",
+      "parent_stamp": "1791613931-318581",
+      "parent_run": "runs/sab_85/frontier/1791613931-318581",
+      "ready": true
+    },
+    {
+      "sample_idx": 31,
+      "task_id": "18",
+      "step_idx": "step_01",
+      "step_no": 1,
+      "role": "neutral",
+      "step_type": "data_inspection",
+      "run_outcome": "success",
+      "stratum": "stable_pass",
+      "parent_stamp": "1791614252-322475",
+      "parent_run": "runs/sab_18/frontier/1791614252-322475",
+      "ready": true
+    },
+    {
+      "sample_idx": 35,
+      "task_id": "67",
+      "step_idx": "step_04",
+      "step_no": 4,
+      "role": "critical_failure",
+      "step_type": "compute_run",
+      "run_outcome": "failure",
+      "stratum": "stable_fail",
+      "parent_stamp": "1791613863-318166",
+      "parent_run": "runs/sab_67/frontier/1791613863-318166",
+      "ready": true
+    },
+    {
+      "sample_idx": 36,
+      "task_id": "44",
+      "step_idx": "step_04",
+      "step_no": 4,
+      "role": "neutral",
+      "step_type": "data_inspection",
+      "run_outcome": "failure",
+      "stratum": "stable_fail",
+      "parent_stamp": "1791614343-341588",
+      "parent_run": "runs/sab_44/frontier/1791614343-341588",
+      "ready": true
+    },
+    {
+      "sample_idx": 37,
+      "task_id": "34",
+      "step_idx": "step_01",
+      "step_no": 1,
+      "role": "critical_failure",
+      "step_type": "compute_run",
+      "run_outcome": "failure",
+      "stratum": "stable_fail",
+      "parent_stamp": "1791612856-279147",
+      "parent_run": "runs/sab_34/frontier/1791612856-279147",
+      "ready": true
+    },
+    {
+      "sample_idx": 38,
+      "task_id": "44",
+      "step_idx": "step_05",
+      "step_no": 5,
+      "role": "critical_failure",
+      "step_type": "compute_run",
+      "run_outcome": "failure",
+      "stratum": "stable_fail",
+      "parent_stamp": "1791613127-299358",
+      "parent_run": "runs/sab_44/frontier/1791613127-299358",
+      "ready": true
+    },
+    {
+      "sample_idx": 40,
+      "task_id": "34",
+      "step_idx": "step_01",
+      "step_no": 1,
+      "role": "neutral",
+      "step_type": "data_inspection",
+      "run_outcome": "failure",
+      "stratum": "stable_fail",
+      "parent_stamp": "1791614163-321498",
+      "parent_run": "runs/sab_34/frontier/1791614163-321498",
+      "ready": true
+    },
+    {
+      "sample_idx": 41,
+      "task_id": "67",
+      "step_idx": "step_02",
+      "step_no": 2,
+      "role": "neutral",
+      "step_type": "method_design",
+      "run_outcome": "failure",
+      "stratum": "stable_fail",
+      "parent_stamp": "1791614918-361358",
+      "parent_run": "runs/sab_67/frontier/1791614918-361358",
+      "ready": true
+    },
+    {
+      "sample_idx": 43,
+      "task_id": "67",
+      "step_idx": "step_04",
+      "step_no": 4,
+      "role": "critical_failure",
+      "step_type": "compute_run",
+      "run_outcome": "failure",
+      "stratum": "stable_fail",
+      "parent_stamp": "1791614918-361358",
+      "parent_run": "runs/sab_67/frontier/1791614918-361358",
+      "ready": true
+    },
+    {
+      "sample_idx": 45,
+      "task_id": "67",
+      "step_idx": "step_03",
+      "step_no": 3,
+      "role": "critical_failure",
+      "step_type": "compute_run",
+      "run_outcome": "failure",
+      "stratum": "stable_fail",
+      "parent_stamp": "1791613863-318166",
+      "parent_run": "runs/sab_67/frontier/1791613863-318166",
+      "ready": true
+    },
+    {
+      "sample_idx": 46,
+      "task_id": "5",
+      "step_idx": "step_02",
+      "step_no": 2,
+      "role": "critical_failure",
+      "step_type": "compute_run",
+      "run_outcome": "failure",
+      "stratum": "stable_fail",
+      "parent_stamp": "1791613243-300389",
+      "parent_run": "runs/sab_5/frontier/1791613243-300389",
+      "ready": true
+    },
+    {
+      "sample_idx": 48,
+      "task_id": "44",
+      "step_idx": "step_04",
+      "step_no": 4,
+      "role": "critical_failure",
+      "step_type": "compute_run",
+      "run_outcome": "failure",
+      "stratum": "stable_fail",
+      "parent_stamp": "1791613127-299358",
+      "parent_run": "runs/sab_44/frontier/1791613127-299358",
+      "ready": true
+    },
+    {
+      "sample_idx": 49,
+      "task_id": "34",
+      "step_idx": "step_02",
+      "step_no": 2,
+      "role": "critical_failure",
+      "step_type": "compute_run",
+      "run_outcome": "failure",
+      "stratum": "stable_fail",
+      "parent_stamp": "1791614163-321498",
+      "parent_run": "runs/sab_34/frontier/1791614163-321498",
+      "ready": true
+    },
+    {
+      "sample_idx": 50,
+      "task_id": "35",
+      "step_idx": "step_01",
+      "step_no": 1,
+      "role": "critical_failure",
+      "step_type": "compute_run",
+      "run_outcome": "failure",
+      "stratum": "stable_fail",
+      "parent_stamp": "1791612654-276937",
+      "parent_run": "runs/sab_35/frontier/1791612654-276937",
+      "ready": true
+    },
+    {
+      "sample_idx": 51,
+      "task_id": "5",
+      "step_idx": "step_01",
+      "step_no": 1,
+      "role": "critical_failure",
+      "step_type": "compute_run",
+      "run_outcome": "failure",
+      "stratum": "stable_fail",
+      "parent_stamp": "1791614495-343084",
+      "parent_run": "runs/sab_5/frontier/1791614495-343084",
+      "ready": true
+    },
+    {
+      "sample_idx": 53,
+      "task_id": "35",
+      "step_idx": "step_01",
+      "step_no": 1,
+      "role": "critical_failure",
+      "step_type": "compute_run",
+      "run_outcome": "failure",
+      "stratum": "stable_fail",
+      "parent_stamp": "1791613992-319454",
+      "parent_run": "runs/sab_35/frontier/1791613992-319454",
+      "ready": true
+    },
+    {
+      "sample_idx": 55,
+      "task_id": "58",
+      "step_idx": "step_02",
+      "step_no": 2,
+      "role": "neutral",
+      "step_type": "data_inspection",
+      "run_outcome": "success",
+      "stratum": "flaky",
+      "parent_stamp": "1791612832-278797",
+      "parent_run": "runs/sab_58/frontier/1791612832-278797",
+      "ready": true
+    },
+    {
+      "sample_idx": 56,
+      "task_id": "58",
+      "step_idx": "step_02",
+      "step_no": 2,
+      "role": "neutral",
+      "step_type": "data_inspection",
+      "run_outcome": "failure",
+      "stratum": "flaky",
+      "parent_stamp": "1791614139-321155",
+      "parent_run": "runs/sab_58/frontier/1791614139-321155",
+      "ready": true
+    },
+    {
+      "sample_idx": 57,
+      "task_id": "40",
+      "step_idx": "step_02",
+      "step_no": 2,
+      "role": "neutral",
+      "step_type": "data_inspection",
+      "run_outcome": "success",
+      "stratum": "flaky",
+      "parent_stamp": "1791613483-305791",
+      "parent_run": "runs/sab_40/frontier/1791613483-305791",
+      "ready": true
+    },
+    {
+      "sample_idx": 58,
+      "task_id": "40",
+      "step_idx": "step_02",
+      "step_no": 2,
+      "role": "neutral",
+      "step_type": "compute_run",
+      "run_outcome": "failure",
+      "stratum": "flaky",
+      "parent_stamp": "1791614542-345089",
+      "parent_run": "runs/sab_40/frontier/1791614542-345089",
+      "ready": true
+    },
+    {
+      "sample_idx": 59,
+      "task_id": "40",
+      "step_idx": "step_04",
+      "step_no": 4,
+      "role": "critical_success",
+      "step_type": "compute_run",
+      "run_outcome": "success",
+      "stratum": "flaky",
+      "parent_stamp": "1791613483-305791",
+      "parent_run": "runs/sab_40/frontier/1791613483-305791",
+      "ready": true
+    }
+  ],
+  "skipped": [
+    [
+      6,
+      "neutral_quota"
+    ],
+    [
+      7,
+      "neutral_quota"
+    ],
+    [
+      13,
+      "neutral_quota"
+    ],
+    [
+      14,
+      "neutral_quota"
+    ],
+    [
+      15,
+      "neutral_quota"
+    ],
+    [
+      19,
+      "neutral_quota"
+    ],
+    [
+      20,
+      "neutral_quota"
+    ],
+    [
+      21,
+      "neutral_quota"
+    ],
+    [
+      22,
+      "neutral_quota"
+    ],
+    [
+      23,
+      "neutral_quota"
+    ],
+    [
+      24,
+      "neutral_quota"
+    ],
+    [
+      26,
+      "neutral_quota"
+    ],
+    [
+      32,
+      "neutral_quota"
+    ],
+    [
+      33,
+      "neutral_quota"
+    ],
+    [
+      34,
+      "neutral_quota"
+    ],
+    [
+      39,
+      "neutral_quota"
+    ],
+    [
+      42,
+      "neutral_quota"
+    ],
+    [
+      44,
+      "neutral_quota"
+    ],
+    [
+      47,
+      "neutral_quota"
+    ],
+    [
+      52,
+      "neutral_quota"
+    ],
+    [
+      54,
+      "neutral_quota"
+    ],
+    [
+      60,
+      "neutral_quota"
+    ]
+  ]
+}
