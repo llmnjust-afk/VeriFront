@@ -1,28 +1,36 @@
-# P1 task pool — frozen 2026-10-10 (12 new tasks; P0 five already at the frozen
-# 12-step budget). Selection criteria: objective eval (all verified tasks),
-# bounded dep superset, small datasets, domain spread.
-# Each task runs 2x with configs/sampling_p1.yaml -> 24 new + 5 existing = 29 trajectories.
+# P1 task pool — frozen 2026-10-10, CORRECTED after judge-eval discovery:
+# 69/111 verified eval programs import gpt4_visual_judge (GPT-4V judge) —
+# visualization tasks are judge-scored. Protocol requires objective Y, so the
+# pool draws ONLY from the 38 objective tasks (csv/json-checked).
+# Pool: 11 new tasks below + P0 five (29,34,45,60,87) = 16 tasks;
+# runs: 11x2 + 5 = 27 trajectories at the frozen 12-step budget.
 
 pool:
-  - {instance_id: 24, domain: "Psychology and Cognitive science", gold: ecg_processing_vis1.py,  deps: biopsykit}
-  - {instance_id: 37, domain: "Psychology and Cognitive science", gold: cft.py,                  deps: biopsykit}
-  - {instance_id: 42, domain: "Psychology and Cognitive science", gold: EDR_analyze.py,          deps: neurokit2}
-  - {instance_id: 44, domain: "Psychology and Cognitive science", gold: imu.py,                  deps: biopsykit}
-  - {instance_id: 59, domain: "Psychology and Cognitive science", gold: nvc_heatmap.py,          deps: "ccobra,seaborn"}
-  - {instance_id: 63, domain: "Psychology and Cognitive science", gold: bio_interval_analyze.py, deps: neurokit2}
+  - {instance_id: 37, domain: "Psychology and Cognitive science", gold: cft.py,                  deps: "biopsykit==0.9.0"}
+  - {instance_id: 44, domain: "Psychology and Cognitive science", gold: imu.py,                  deps: "biopsykit==0.9.0"}
   - {instance_id: 92, domain: "Psychology and Cognitive science", gold: h_importances.py,        deps: numpy}
-  - {instance_id: 77, domain: "Geographical Information Science", gold: WaterQuality.py,         deps: "geopandas,shapely"}
-  - {instance_id: 10, domain: "Geographical Information Science", gold: toronto_new.py,          deps: geopandas}
-  - {instance_id: 79, domain: "Bioinformatics",                   gold: violin.py,               deps: "scanpy,anndata"}
-  - {instance_id: 96, domain: "Bioinformatics",                   gold: scatter.py,              deps: "scanpy,anndata"}
-  - {instance_id: 94, domain: "Computational Chemistry",          gold: polyverse_visualize_molecules.py, deps: networkx}
+  - {instance_id: 35, domain: "Psychology and Cognitive science", gold: RRV_analyze.py,          deps: neurokit2}
+  - {instance_id: 58, domain: "Psychology and Cognitive science", gold: nvc_gen_ind.py,          deps: ccobra}
+  - {instance_id: 85, domain: "Psychology and Cognitive science", gold: saliva.py,               deps: "biopsykit==0.9.0"}
+  - {instance_id: 67, domain: "Psychology and Cognitive science", gold: CogSci_pattern_high_sim.py, deps: ccobra}
+  - {instance_id: 18, domain: "Bioinformatics",                   gold: DILI_models_ECFP_RF.py,  deps: "rdkit,sklearn"}
+  - {instance_id: 40, domain: "Bioinformatics",                   gold: MD_RF.py,                deps: "rdkit,sklearn"}
+  - {instance_id: 53, domain: "Geographical Information Science", gold: mountainLion3.py,        deps: rasterio}
+  - {instance_id: 5,  domain: "Bioinformatics",                   gold: dkpes_model_development_1.py, deps: sklearn}
 
 excluded_this_phase:
-  - {instance_id: 26, reason: "MDAnalysis+prolif: dep superset violation"}
-  - {instance_id: 17, reason: "qsprpred+scaffviz: heavy install chain"}
-  - {instance_id: 71, reason: "torch required: violates lightweight P1 rule"}
-  - {instance_id: 89, reason: "geoplot pulls cartopy (native GEOS); revisit via micromamba if needed"}
-  - {instance_id: 3,  reason: "matminer chain (pymatgen): deferred"}
-  - {instance_id: 9,  reason: "deepchem: heavy + TF-adjacent"}
+  - {reason: "judge-eval (gpt4_visual_judge) — protocol excludes from objective Y", ids: "64 verified tasks incl. 24,42,59,63,77,10,79,96,94 of the former draft pool"}
+  - {instance_id: 71, reason: "torch required"}
+  - {instance_id: 95, reason: "deepchem: heavy"}
+  - {instance_id: 2,  reason: "mastml: heavy"}
+  - {instance_id: 26, reason: "MDAnalysis+prolif"}
+  - {instance_id: 17, reason: "qsprpred+scaffviz"}
+  - {instance_id: 3,  reason: "matminer chain"}
 
-env_additions_testbed: [geopandas, shapely, scanpy, anndata, networkx]
+env_additions_testbed: [geopandas, shapely, scanpy, anndata, networkx, igraph, rdkit, rasterio]
+
+correction_note: >
+  The earlier claim 'all 102 verified evals objective' was WRONG — objective
+  detection must grep eval-script CONTENT for gpt4_visual_judge, not filenames.
+  One judge-eval run (task 24 pass1) was produced before the batch was stopped;
+  its trajectory is retained as exploratory data but is NOT part of objective Y.
