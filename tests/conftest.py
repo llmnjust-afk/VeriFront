@@ -3,6 +3,7 @@ paired replacement records."""
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -12,6 +13,24 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 from verifront.traces.schema import Event, RunMeta, Trajectory  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _open_traverse_chain(tmp_path):
+    """When running as root, sandboxed agent steps drop to `nobody`, which needs
+    +x on every ancestor of tmp_path to reach the workdir. Open the chain for
+    every test; harmless for non-sandbox tests."""
+    if os.geteuid() == 0:
+        p = tmp_path.resolve()
+        while p != p.parent:
+            try:
+                os.chmod(p, 0o751)
+            except OSError:
+                pass
+            if p == Path("/tmp"):
+                break
+            p = p.parent
+    yield
 
 
 @pytest.fixture()

@@ -63,6 +63,19 @@ FORMAT_ERROR_OBSERVATION = (
     "Respond with EXACTLY ONE <code>...</code> or <final>...</final> block."
 )
 
+# Privilege-drop target for step subprocesses (root runner -> unprivileged agent
+# code). nobody/nogroup cannot read the lab data tree (chmod 750) or /root.
+_NOBODY_UID = 65534
+_NOBODY_GID = 65534
+
+
+def _drop_to_nobody() -> None:  # runs in the forked child, pre-exec
+    """setgroups([]) is essential: subprocess(user=...) alone keeps the root
+    supplementary group, which would re-grant group access to /data/lab."""
+    os.setgroups([])
+    os.setgid(_NOBODY_GID)
+    os.setuid(_NOBODY_UID)
+
 
 @dataclass
 class TaskSpec:
@@ -81,6 +94,10 @@ class CodeActConfig:
     seed: Optional[int] = None
     obs_char_limit: int = 4000
     python_bin: str = "python3"  # per-run task interpreter (SAB task env)
+    sandbox: bool = True  # isolation for step subprocesses (mandatory on lab)
+    sandbox_mode: str = "auto"  # auto | unshare | nobody | off
+    sandbox_hide_paths: tuple = ("/data/lab",)  # host paths hidden from agent code
+    user_site_path: str = "/root/.local/lib/python3.10/site-packages"
 
 
 @dataclass
@@ -244,20 +261,42 @@ class CodeActAgent:
         return result
 
     def _execute(self, script: Path) -> Dict[str, Any]:
+        mode = self._resolve_sandbox_mode()
         try:
-            proc = subprocess.run(
-                [self.config.python_bin, str(script)],
+            kwargs: Dict[str, Any] = dict(
                 cwd=str(self.workdir),
                 capture_output=True,
                 text=True,
                 timeout=self.config.step_timeout_s,
+                env=self._sandbox_env(),
             )
+            cmd: List[str] = [self.config.python_bin, str(script)]
+            if mode == "unshare":
+                cmd = self._unshare_cmd(script)
+            elif mode == "nobody":
+                kwargs["env"] = self._sandbox_env()
+                kwargs["preexec_fn"] = _drop_to_nobody  # clears supplementary groups too
+                if hasattr(os, "chown"):
+                    try:
+                        os.chown(script, _NOBODY_UID, _NOBODY_GID)
+                    except OSError:
+                        pass
+            elif mode != "off":
+                return {"observation": "SANDBOX ERROR: no isolation mode available",
+                        "status": "error", "exit_code": None}
+            proc = subprocess.run(cmd, **kwargs)
             stdout, stderr, code = proc.stdout, proc.stderr, proc.returncode
             timed_out = False
         except subprocess.TimeoutExpired as e:
             stdout = (e.stdout or "") if isinstance(e.stdout, str) else ""
             stderr = (e.stderr or "") if isinstance(e.stderr, str) else ""
             code, timed_out = None, True
+        except PermissionError:
+            return {"observation": "SANDBOX ERROR: privilege drop failed (workdir ownership?)",
+                    "status": "error", "exit_code": None}
+        except FileNotFoundError:
+            return {"observation": "SANDBOX ERROR: isolation wrapper unavailable",
+                    "status": "error", "exit_code": None}
         if timed_out:
             status = "timeout"
         elif code == 0:
@@ -271,6 +310,66 @@ class CodeActAgent:
         if timed_out:
             observation += f"\n[TIMEOUT after {self.config.step_timeout_s}s]"
         return {"observation": observation, "status": status, "exit_code": code}
+
+    _ENV_ALLOWLIST = ("PATH", "HOME", "LANG", "LC_ALL", "TMPDIR", "TERM", "CONDA_PREFIX")
+    _unshare_ok: Optional[bool] = None
+
+    def _resolve_sandbox_mode(self) -> str:
+        mode = self.config.sandbox_mode
+        if mode == "auto":
+            if os.geteuid() == 0 and CodeActAgent._unshare_ok is None:
+                try:
+                    CodeActAgent._unshare_ok = subprocess.run(
+                        ["unshare", "-m", "true"], capture_output=True, timeout=10,
+                    ).returncode == 0
+                except Exception:
+                    CodeActAgent._unshare_ok = False
+            if os.geteuid() == 0 and CodeActAgent._unshare_ok:
+                return "unshare"
+            if os.geteuid() == 0 and _NOBODY_UID is not None:
+                return "nobody"
+            return "off"
+        return mode
+
+    def _sandbox_env(self) -> Dict[str, str]:
+        """Minimal env for agent code: no API keys, no repo paths, no tokens.
+        For the nobody drop we pin PYTHONPATH to the SAME user-site the root
+        eval interpreter resolves, so agent and eval see identical versions."""
+        env = {k: v for k, v in os.environ.items() if k in self._ENV_ALLOWLIST}
+        env.setdefault("HOME", str(self.workdir))
+        if (self._resolve_sandbox_mode() == "nobody"
+                and self.config.user_site_path
+                and Path(self.config.user_site_path).is_dir()):
+            env["PYTHONPATH"] = self.config.user_site_path
+        return env
+
+    def _unshare_cmd(self, script: Path) -> List[str]:
+        """Isolate agent code in a mount namespace (when the kernel allows it).
+
+        - bind-mount the run workdir at a per-run /tmp/wk-<pid> (stable cwd,
+          real dataset copies available, agent sees nothing about host layout);
+        - tmpfs over the workdir PARENT (siblings/other runs invisible) and
+          over every path in sandbox_hide_paths (benchmark cache, eval/gold
+          programs, run dirs, credential files).
+        The script path inside the namespace is /tmp/wk-<pid>/<name>.
+        """
+        wd = str(self.workdir.resolve())
+        tgt = f"/tmp/wk-{os.getpid()}"
+        parent = str(Path(wd).parent)
+        hides = " ; ".join(
+            f"mount -t tmpfs -o size=1M tmpfs {p} 2>/dev/null || {{ echo 'SANDBOX-MOUNT-FAIL {p}' >&2; exit 99; }}"
+            for p in (*self.config.sandbox_hide_paths, parent)
+        )
+        inner = (
+            f"mkdir -p {tgt} && mount --bind {wd} {tgt} || {{ echo 'SANDBOX-BIND-FAIL' >&2; exit 99; }} ; "
+            f"{hides} ; "
+            f'cd {tgt} && exec "$0" "$@"'
+        )
+        return ["unshare", "-m", "sh", "-c", inner,
+                self.config.python_bin, f"{tgt}/{script.name}"]
+
+    def _sandboxed_cmd(self, script: Path) -> List[str]:  # back-compat wrapper
+        return self._unshare_cmd(script)
 
 
 def client_from_config(cfg_path, arm: str = "frontier") -> OpenAICompatClient:

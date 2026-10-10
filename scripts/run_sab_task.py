@@ -12,10 +12,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
 from pathlib import Path
+from uuid import uuid4
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -25,6 +27,7 @@ from verifront.agents.codeact import CodeActConfig, client_from_config  # noqa: 
 from verifront.sab.adapter import (  # noqa: E402
     SabTaskPaths,
     build_task_spec,
+    chown_workdir,
     get_task,
     load_verified_tasks,
     prepare_workdir,
@@ -54,7 +57,11 @@ def main() -> int:
     ap.add_argument("--config", default=str(ROOT / "configs/models.yaml"))
     ap.add_argument("--parquet", default=str(PARQUET_DEFAULT))
     ap.add_argument("--benchmark-root", default=str(BENCHMARK_ROOT_DEFAULT))
-    ap.add_argument("--workdir-root", default=str(ROOT / "runs"))
+    ap.add_argument("--workdir-root", default="/tmp/vf_work",
+                    help="sandbox workdir root (MUST live outside the repo/lab "
+                         "data tree; agents otherwise infer host layout from cwd)")
+    ap.add_argument("--artifacts-root", default=str(ROOT / "runs"),
+                    help="canonical artifact location (trace/result/step files)")
     ap.add_argument("--python-bin", default=PYTHON_BIN_DEFAULT)
     ap.add_argument("--max-steps", type=int, default=12,
                     help="frozen P1 budget (configs/sampling_p1.yaml)")
@@ -74,11 +81,20 @@ def main() -> int:
 
     task_dir = Path(args.workdir_root) / f"sab_{args.instance_id}" / arm_dir
     stamp = f"{int(time.time())}-{os.getpid()}"
+    # Sandbox workdir: unguessable per-run dir under a traverse-only parent,
+    # OUTSIDE the repo/data tree (agents must not infer host layout from cwd).
+    uuid = uuid4().hex[:12]
+    sandbox_dir = task_dir / uuid
+    sandbox_dir.mkdir(parents=True, mode=0o751)
+    vf_root = Path(args.workdir_root)
+    if vf_root.is_dir():
+        os.chmod(vf_root, 0o711)  # traverse-only: unlistable, unguessable children
     paths = SabTaskPaths(
         benchmark_root=Path(args.benchmark_root),
-        workdir=task_dir / stamp,
+        workdir=sandbox_dir / "wd",
     )
-    prepare_workdir(paths)
+    prepare_workdir(paths, row)
+    chown_workdir(paths)
     spec = build_task_spec(row, args.instance_id, extra_rules=args.hint)
     client = client_from_config(args.config, args.arm)
     config = CodeActConfig(
@@ -90,7 +106,10 @@ def main() -> int:
     run = run_codeact(paths, spec, client, config, agent_commit=git_commit())
     ev = run_eval(paths, eval_script, args.python_bin)
 
-    out_dir = paths.workdir
+    out_dir = Path(args.artifacts_root) / f"sab_{args.instance_id}" / arm_dir / stamp
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for f in sorted(paths.workdir.glob("step_*.py")):
+        shutil.copy2(f, out_dir / f.name)
     traj = run.trajectory
     assert traj is not None
     (out_dir / "trace.jsonl").write_text(traj.to_jsonl(), encoding="utf-8")

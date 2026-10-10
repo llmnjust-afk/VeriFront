@@ -30,6 +30,54 @@ _EVAL_LINE_RE = re.compile(r"^\((?P<success>\d)\s*,\s*(?P<detail>.*)\)\s*$")
 # only the dataset tree; eval/gold/rubrics enter the workdir at eval time only).
 _AGENT_HIDDEN = ("gold_programs", "eval_programs", "scoring_rubrics")
 
+_TREE_ROOT_RE = re.compile(r"\|--\s*([A-Za-z0-9_.\-]+)/")
+
+
+def dataset_names_from_row(row) -> list:
+    """Top-level dataset dir names as given to agents (official SAB layout:
+    the dataset folder sits directly in the working directory, e.g. ./dkpes/)."""
+    tree = str(row.get("dataset_folder_tree") or "") if hasattr(row, "get") else ""
+    names, seen = [], set()
+    for m in _TREE_ROOT_RE.finditer(tree):
+        n = m.group(1)
+        if n not in seen and n not in ("pred_results", "benchmark"):
+            seen.add(n)
+            names.append(n)
+    return names
+
+
+def prepare_workdir(paths: SabTaskPaths, row=None) -> None:
+    """Create the OFFICIAL agent view: dataset dirs copied as REAL files at the
+    workdir root + empty pred_results. No benchmark/ link exists while the
+    agent works (gold/eval/rubrics enter only at eval time via run_eval).
+
+    Real copies (not symlinks) so that mount-namespace isolation of host paths
+    cannot break dataset access, and so agents cannot traverse into the
+    benchmark cache through symlink targets.
+    """
+    wd = paths.workdir
+    wd.mkdir(parents=True, exist_ok=True)
+    datasets_src = paths.benchmark_link_target() / "datasets"
+    if not datasets_src.is_dir():
+        raise FileNotFoundError(f"benchmark datasets missing: {datasets_src}")
+    stale = wd / "benchmark"
+    if stale.is_symlink() or stale.exists():
+        if stale.is_symlink():
+            stale.unlink()
+        else:
+            shutil.rmtree(stale)
+    names = dataset_names_from_row(row) if row is not None else []
+    for name in names:
+        src = datasets_src / name
+        if not src.is_dir():
+            raise FileNotFoundError(f"dataset dir missing: {src}")
+        dst = wd / name
+        if dst.exists():
+            shutil.rmtree(dst)
+        shutil.copytree(src, dst, symlinks=False)
+    (wd / "pred_results").mkdir(exist_ok=True)
+    _assert_agent_view_clean(wd)
+
 
 @dataclass
 class SabTaskPaths:
@@ -53,42 +101,15 @@ def get_task(df, instance_id: int):
     return rows.iloc[0]
 
 
-def prepare_workdir(paths: SabTaskPaths) -> None:
-    """Create workdir with a SANITIZED agent view + empty pred_results.
-
-    Agent view: benchmark/ is a real directory whose only entry is a symlink
-    `datasets` -> <benchmark_root>/benchmark/datasets. gold_programs /
-    eval_programs / scoring_rubrics are invisible while the agent works
-    (official SAB layout). run_eval() swaps in the full tree at eval time.
-    """
-    wd = paths.workdir
-    wd.mkdir(parents=True, exist_ok=True)
-    datasets_src = paths.benchmark_link_target() / "datasets"
-    if not datasets_src.is_dir():
-        raise FileNotFoundError(f"benchmark datasets missing: {datasets_src}")
-    staged = wd / "benchmark"
-    if staged.is_symlink() or staged.exists():
-        if staged.is_symlink() and not staged.exists():
-            staged.unlink()
-        elif staged.is_dir() and not staged.is_symlink():
-            shutil.rmtree(staged)
-        else:
-            raise FileExistsError(f"{staged} exists and is not a directory")
-    staged.mkdir()
-    os.symlink(datasets_src, staged / "datasets")
-    _assert_agent_view_clean(staged)
-    (wd / "pred_results").mkdir(exist_ok=True)
-
-
-def _assert_agent_view_clean(staged: Path) -> None:
-    names = {p.name for p in staged.iterdir()}
-    leaked = names.intersection(_AGENT_HIDDEN)
+def _assert_agent_view_clean(wd: Path) -> None:
+    names = {p.name for p in wd.iterdir() if p.name != "pred_results"}
+    leaked = names & (set(_AGENT_HIDDEN) | {"benchmark"})
     if leaked:
-        raise RuntimeError(f"agent view leaks protected dirs: {sorted(leaked)}")
+        raise RuntimeError(f"agent view leaks protected entries: {sorted(leaked)}")
 
 
 def _ensure_full_benchmark(paths: SabTaskPaths) -> None:
-    """Swap the sanitized agent view for the full benchmark tree (eval time)."""
+    """Materialize the full benchmark tree link for the eval phase."""
     staged = paths.workdir / "benchmark"
     target = paths.benchmark_link_target()
     if staged.is_symlink() and staged.resolve() == target.resolve():
@@ -98,6 +119,20 @@ def _ensure_full_benchmark(paths: SabTaskPaths) -> None:
     else:
         shutil.rmtree(staged)
     os.symlink(target, staged)
+
+
+NOBODY_UID, NOBODY_GID = 65534, 65534
+
+
+def chown_workdir(paths: SabTaskPaths) -> None:
+    """Hand the agent workdir to `nobody` so step code (dropped privileges)
+    can read datasets and write outputs; siblings stay unreadable."""
+    entries = [paths.workdir] + sorted(paths.workdir.rglob("*"))
+    for p in entries:
+        try:
+            os.chown(p, NOBODY_UID, NOBODY_GID)
+        except OSError:
+            pass
 
 
 def build_task_spec(row, instance_id: int, extra_rules: str = "") -> TaskSpec:
