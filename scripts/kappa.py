@@ -31,8 +31,17 @@ def main() -> int:
     ap.add_argument("--b", required=True)
     args = ap.parse_args()
 
-    A = {json.loads(l)["i"]: json.loads(l) for l in open(args.a, encoding="utf-8") if l.strip()}
-    B = {json.loads(l)["i"]: json.loads(l) for l in open(args.b, encoding="utf-8") if l.strip()}
+    def load(path: str) -> dict:
+        out = {}
+        for l in open(path, encoding="utf-8"):
+            if not l.strip():
+                continue
+            d = json.loads(l)
+            out[d.get("i", d.get("sample_idx"))] = d
+        return out
+
+    A = load(args.a)
+    B = load(args.b)
     common = sorted(set(A) & set(B))
     if len(common) < len(A):
         print(f"WARNING: B missing {len(A) - len(common)} steps: {sorted(set(A) - set(B))[:10]}")
