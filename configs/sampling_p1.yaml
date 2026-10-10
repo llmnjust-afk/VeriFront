@@ -1,0 +1,42 @@
+# P1 sampling configuration — FROZEN 2026-10-10 (do not change mid-phase;
+# any change requires a new labeled condition and a logged deviation).
+
+frontier:
+  model_id: gpt-5.5-2026-04-23        # snapshot frozen (ChatAnywhere relay)
+  temperature: 0.0
+  max_tokens: 8192
+  seed: null                          # relay may ignore seed; determinism rests on temperature=0
+  note_task34: >
+    tasks 34 reproduced EXACTLY (57/91) at both 6-step and 12-step budgets —
+    relay-level temperature=0 determinism is empirically strong.
+
+execution:
+  layer: CodeAct-lite                 # VeriFront-native (OpenHands infeasible, see protocol §6)
+  max_steps: 12                       # parity with official SAB budget (1 gen + 10 self-debug rounds);
+                                      # rationale: sensitivity sweep 2026-10-10 — task 29 flipped
+                                      # FAIL(8/16)->PASS(16/16) when raised 6->12; tasks 34/60 unchanged
+  step_timeout_s: 300
+  python_bin: testbed env python (per environment.lock)
+  interaction_mode: one <code> block per turn (differs from official single-program +
+    error-feedback paradigm; recorded as execution-layer deviation, protocol §8)
+
+information_surface:
+  use_knowledge: true                 # domain_knowledge always passed (corresponds to official
+                                      # use_knowledge=True mode); frozen to match the P0 sweep arms
+  gold_programs_visible: false        # NEVER shown to agents
+  task_fields_shown: [task_inst, domain_knowledge, dataset_folder_tree, dataset_preview,
+                      output_fname]
+
+tasks_p0_sweep:
+  ids: [29, 34, 45, 60, 87]
+  sr_6step: "2/5"
+  sr_12step: "3/5"
+  failure_modes:
+    34: "method-level stable failure in RR-interval extraction (budget-independent, deterministic)"
+    60: "derivation mismatch in improvement/hit columns; more budget -> more wandering (100k tokens)"
+
+p1_plan:
+  trajectories: 20-30 (mix of successes and failures; failures are anchor material)
+  task_pool: extend beyond the P0 five with the same objective-eval criterion; per-task
+    deps must stay inside a bounded superset of the testbed env (record any additions)
+  anchors: ">=20 recovery anchors mined from failures + succeeded-but-decomposable runs"
