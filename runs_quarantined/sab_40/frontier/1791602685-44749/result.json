@@ -1,0 +1,82 @@
+{
+  "instance_id": 40,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "a4c4b90",
+  "status": "completed",
+  "eval_success": 1,
+  "eval_detail": "Mean F1: 0.746633819137239",
+  "eval_returncode": 0,
+  "eval_stdout_tail": "(1, 'Mean F1: 0.746633819137239')\n",
+  "eval_stderr_tail": "",
+  "final_answer": "Trained Random Forest DILI classifiers using the molecular descriptor dataset in `benchmark/datasets/dili_MD`.\n\nSaved prediction files:\n- `pred_results/MD_MCNC_RF.csv` **(required output)**\n- `pred_results/MD_MCLCNC_RF.csv`\n- `pred_results/MD_all_RF.csv`\n\nEach output contains the test descriptor rows plus a `label` column with predicted labels `DILI` or `NoDILI`.\n\nKey run details:\n- Training descriptor matrix: 923 rows × 1175 usable descriptor features\n- Test descriptor matrix: 55 rows × 1175 usable descriptor features\n- Required `MD_MCNC_RF.csv` shape: 55 rows × 1177 columns\n- `MD_MCNC_RF.csv` prediction counts:\n  - `NoDILI`: 32\n  - `DILI`: 23\n- Best MCNC validation balanced accuracy during compact hyperparameter search: 0.7201\n- Selected MCNC RF parameters:\n  - `n_estimators`: 300\n  - `max_features`: 0.35\n  - `max_depth`: 18\n  - `min_samples_leaf`: 2\n  - `class_weight`: `balanced_subsample`\n\nA training/search summary was also saved to:\n- `pred_results/MD_RF_training_summary.json`",
+  "token_usage": {
+    "prompt": 180849,
+    "completion": 8878
+  },
+  "wall_s": 409.561,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 1,
+      "exec_status": "error"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 3,
+      "kind": "code",
+      "script": "step_03.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 4,
+      "kind": "code",
+      "script": "step_04.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 5,
+      "kind": "code",
+      "script": "step_05.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 6,
+      "kind": "code",
+      "script": "step_06.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 7,
+      "kind": "code",
+      "script": "step_07.py",
+      "exit_code": null,
+      "exec_status": "timeout"
+    },
+    {
+      "step": 8,
+      "kind": "code",
+      "script": "step_08.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 9,
+      "kind": "final"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

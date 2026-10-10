@@ -1,0 +1,106 @@
+{
+  "instance_id": 60,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "0fb05fc",
+  "status": "budget_exhausted",
+  "eval_success": 0,
+  "eval_detail": "eval_crash (no verdict line; see stdout/stderr tails)",
+  "eval_returncode": 1,
+  "eval_stdout_tail": "",
+  "eval_stderr_tail": "\n  File \"/root/.local/lib/python3.10/site-packages/pandas/io/parsers/readers.py\", line 1620, in __init__\n    self._engine = self._make_engine(f, self.engine)\n  File \"/root/.local/lib/python3.10/site-packages/pandas/io/parsers/readers.py\", line 1880, in _make_engine\n    self.handles = get_handle(\n  File \"/root/.local/lib/python3.10/site-packages/pandas/io/common.py\", line 873, in get_handle\n    handle = open(\nFileNotFoundError: [Errno 2] No such file or directory: './pred_results/accuracies.csv'\n",
+  "final_answer": null,
+  "token_usage": {
+    "prompt": 100960,
+    "completion": 6578
+  },
+  "wall_s": 109.99,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 3,
+      "kind": "code",
+      "script": "step_03.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 4,
+      "kind": "code",
+      "script": "step_04.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 5,
+      "kind": "code",
+      "script": "step_05.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 6,
+      "kind": "code",
+      "script": "step_06.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 7,
+      "kind": "code",
+      "script": "step_07.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 8,
+      "kind": "code",
+      "script": "step_08.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 9,
+      "kind": "code",
+      "script": "step_09.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 10,
+      "kind": "code",
+      "script": "step_10.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 11,
+      "kind": "code",
+      "script": "step_11.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 12,
+      "kind": "code",
+      "script": "step_12.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

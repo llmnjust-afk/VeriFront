@@ -1,0 +1,5 @@
+event_number,marker_value,onset_idx,window_start_idx,window_end_idx,duration_s
+1,1.0,1017,1018,1314,2.96
+2,2.5,4916,4917,5216,2.99
+3,0.5,9160,9161,9459,2.98
+4,0.5,12896,12897,13193,2.96

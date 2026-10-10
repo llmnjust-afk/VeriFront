@@ -1,0 +1,10 @@
+[
+  {
+    "type": "dir",
+    "path": "benchmark/datasets/saliva_data"
+  },
+  {
+    "type": "file",
+    "path": "benchmark/datasets/saliva_data/data.pkl"
+  }
+]

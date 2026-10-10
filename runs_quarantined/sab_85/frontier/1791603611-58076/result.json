@@ -1,0 +1,68 @@
+{
+  "instance_id": 85,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "a4c4b90",
+  "status": "completed",
+  "eval_success": 1,
+  "eval_detail": "N/A",
+  "eval_returncode": 0,
+  "eval_stdout_tail": "(1, 'N/A')\n",
+  "eval_stderr_tail": "",
+  "final_answer": "Produced `pred_results/saliva_pred.json`.\n\nSummary:\n- Loaded saliva dataset from `benchmark/datasets/saliva_data/data.pkl`.\n- Computed standard per-subject cortisol distribution/statistical features:\n  - `argmax`\n  - `mean`\n  - `std`\n  - `skew`\n  - `kurt`\n- Included each subject’s `condition`.\n- Saved as a dictionary of dictionaries keyed by subject ID.\n\nKey numbers:\n- Subjects processed: 22\n- Control subjects: 11\n- Intervention subjects: 11\n- Output file size: 4172 bytes\n\nResult location:\n- `pred_results/saliva_pred.json`",
+  "token_usage": {
+    "prompt": 20148,
+    "completion": 3437
+  },
+  "wall_s": 44.59,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 1,
+      "exec_status": "error"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 3,
+      "kind": "code",
+      "script": "step_03.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 4,
+      "kind": "code",
+      "script": "step_04.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 5,
+      "kind": "code",
+      "script": "step_05.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 6,
+      "kind": "code",
+      "script": "step_06.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 7,
+      "kind": "final"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

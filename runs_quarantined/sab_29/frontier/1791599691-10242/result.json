@@ -1,0 +1,54 @@
+{
+  "instance_id": 29,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "0fb05fc",
+  "status": "completed",
+  "eval_success": 1,
+  "eval_detail": "16 / 16",
+  "eval_returncode": 0,
+  "eval_stdout_tail": "(1, '16 / 16')\n",
+  "eval_stderr_tail": "",
+  "final_answer": "Produced the event-related biosignal analysis file:\n\n`pred_results/bio_eventrelated_100hz_analysis_pred.csv`\n\nThe file contains 4 localized photosensor events with columns:\n- `Condition`\n- `ECG_Rate_Mean`\n- `RSP_Rate_Mean`\n- `EDA_Peak_Amplitude`\n\nLocalized events occurred at approximately 10.18 s, 49.17 s, 91.60 s, and 128.96 s.\n\nSaved results:\n\n| Condition | ECG_Rate_Mean | RSP_Rate_Mean | EDA_Peak_Amplitude |\n|---|---:|---:|---:|\n| Negative | -2.144658 | 0.204488 | 0.012579 |\n| Neutral | -3.855272 | 0.209118 | 0.101065 |\n| Neutral | -0.675385 | 0.081212 | 0.000091 |\n| Negative | -1.337834 | 0.014159 | 0.590262 |",
+  "token_usage": {
+    "prompt": 19698,
+    "completion": 4067
+  },
+  "wall_s": 52.752,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 1,
+      "exec_status": "error"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 3,
+      "kind": "code",
+      "script": "step_03.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 4,
+      "kind": "code",
+      "script": "step_04.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 5,
+      "kind": "final"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

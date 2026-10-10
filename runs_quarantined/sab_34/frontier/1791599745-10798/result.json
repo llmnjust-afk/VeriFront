@@ -1,0 +1,47 @@
+{
+  "instance_id": 34,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "0fb05fc",
+  "status": "completed",
+  "eval_success": 0,
+  "eval_detail": "57 / 91",
+  "eval_returncode": 0,
+  "eval_stdout_tail": "(0, '57 / 91')\n",
+  "eval_stderr_tail": "",
+  "final_answer": "Produced HRV analysis features from `bio_resting_5min_100hz.csv` using ECG R-peak detection at 100 Hz.\n\nKey results:\n- ECG duration: 299.00 s\n- Detected R-peaks: 432\n- RR intervals: 431\n- Mean RR: 692.436 ms\n- SDNN: approximately 48.841 ms\n- Mean heart rate: 86.651 bpm\n- Extracted features:\n  - Time-domain: 25\n  - Frequency-domain: 10\n  - Non-linear domain: 56\n  - Plus 6 metadata columns\n\nSaved output:\n`pred_results/hrv_analysis_pred.csv`",
+  "token_usage": {
+    "prompt": 11411,
+    "completion": 2676
+  },
+  "wall_s": 37.892,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 3,
+      "kind": "code",
+      "script": "step_03.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 4,
+      "kind": "final"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

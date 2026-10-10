@@ -1,0 +1,61 @@
+{
+  "instance_id": 60,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "a4c4b90",
+  "status": "completed",
+  "eval_success": 0,
+  "eval_detail": "",
+  "eval_returncode": 0,
+  "eval_stdout_tail": "(0, '')\n",
+  "eval_stderr_tail": "",
+  "final_answer": "Produced the required CSV file:\n\npred_results/accuracies.csv\n\nContents:\n- 2,235 model/rule evaluation rows\n- 7 syllogistic reasoning models:\n  Atmosphere, Conversion, MMT, Matching, PHM, PSYCOP, VerbalModels\n- 5 NVC rules:\n  EmptyStart, FiguralRule, NegativityRule, PartNeg, ParticularityRule\n- 64 syllogistic tasks\n- Columns:\n  model, nvc, task, prediction, plain_prediction, truth, improvement, hit_model, hit_nvc\n\nThe file records each original model prediction, the prediction after applying an NVC rule, the MFA benchmark answer, and the resulting accuracy improvement.\n\nBest average improvements observed include:\n- Matching + PartNeg: +0.421875\n- PHM + PartNeg: +0.398438\n- Atmosphere + PartNeg: +0.375000\n- MMT + PartNeg: +0.283333\n- NegativityRule generally improves several models by about +0.25\n\nThe output was saved successfully at the required path.",
+  "token_usage": {
+    "prompt": 30850,
+    "completion": 4639
+  },
+  "wall_s": 52.266,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 3,
+      "kind": "code",
+      "script": "step_03.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 4,
+      "kind": "code",
+      "script": "step_04.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 5,
+      "kind": "code",
+      "script": "step_05.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 6,
+      "kind": "final"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

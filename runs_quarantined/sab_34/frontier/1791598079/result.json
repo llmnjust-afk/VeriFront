@@ -1,0 +1,37 @@
+{
+  "instance_id": 34,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "8e856c2",
+  "status": "completed",
+  "eval_success": 0,
+  "eval_detail": "57 / 91",
+  "final_answer": "HRV analysis completed successfully.\n\nProduced file:\n- `pred_results/hrv_analysis_pred.csv`\n\nInput used:\n- `/data/lab/gold_sanity/29/benchmark/datasets/biosignals/bio_resting_5min_100hz.csv`\n\nKey results:\n- ECG sampling rate: 100 Hz\n- ECG duration: 299.00 s\n- Peak detection method: NeuroKit2\n- Detected R-peaks: 432\n- Mean HR by peak count: 86.69 bpm\n- Output table shape: 1 row × 96 columns\n\nSelected HRV features:\n- HRV_NN_Count: 431\n- HRV_MeanNN: 692.436 ms\n- HRV_SDNN: 48.841 ms\n- HRV_RMSSD: 39.059 ms\n- HRV_LF: 0.031147\n- HRV_HF: 0.030989\n- HRV_LFHF: 1.005109\n- HRV_SD1: 27.651\n- HRV_SD2: 63.131\n- HRV_SampEn: 2.293283",
+  "token_usage": {
+    "prompt": 15169,
+    "completion": 8802
+  },
+  "wall_s": 79.68,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 1,
+      "exec_status": "error"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 3,
+      "kind": "final"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

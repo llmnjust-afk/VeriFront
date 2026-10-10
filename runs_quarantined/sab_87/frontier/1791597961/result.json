@@ -1,0 +1,61 @@
+{
+  "instance_id": 87,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "8e856c2",
+  "status": "budget_exhausted",
+  "eval_success": 1,
+  "eval_detail": "N/A",
+  "final_answer": null,
+  "token_usage": {
+    "prompt": 16504,
+    "completion": 3350
+  },
+  "wall_s": 44.26,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 3,
+      "kind": "code",
+      "script": "step_03.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 4,
+      "kind": "code",
+      "script": "step_04.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 5,
+      "kind": "code",
+      "script": "step_05.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 6,
+      "kind": "code",
+      "script": "step_06.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

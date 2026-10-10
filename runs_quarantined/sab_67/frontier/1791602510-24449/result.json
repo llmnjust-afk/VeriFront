@@ -1,0 +1,75 @@
+{
+  "instance_id": 67,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "a4c4b90",
+  "status": "completed",
+  "eval_success": 0,
+  "eval_detail": "11 / 14",
+  "eval_returncode": 0,
+  "eval_stdout_tail": "(0, '11 / 14')\n",
+  "eval_stderr_tail": "",
+  "final_answer": "Produced the required similarity-score CSV:\n\n`pred_results/CogSci_pattern_high_sim_data_pred.csv`\n\nIt contains cosine similarities between each cognitive model prediction vector and the high-pattern vectors for the two traits, with columns:\n\n- `conscientiousness`\n- `openness`\n\nKey results:\n\n| Model | conscientiousness | openness |\n|---|---:|---:|\n| Atmosphere | 0.203524 | 0.071843 |\n| Conversion | 0.070318 | 0.714965 |\n| Matching | 0.244567 | 0.010762 |\n| MMT | 0.195676 | 0.461647 |\n| PHM | 0.204021 | 0.069065 |\n| PSYCOP | 0.097506 | 0.778320 |\n| VerbalModels | 0.091567 | 0.591602 |",
+  "token_usage": {
+    "prompt": 46228,
+    "completion": 3787
+  },
+  "wall_s": 46.76,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 1,
+      "exec_status": "error"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 3,
+      "kind": "code",
+      "script": "step_03.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 4,
+      "kind": "code",
+      "script": "step_04.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 5,
+      "kind": "code",
+      "script": "step_05.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 6,
+      "kind": "code",
+      "script": "step_06.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 7,
+      "kind": "code",
+      "script": "step_07.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 8,
+      "kind": "final"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

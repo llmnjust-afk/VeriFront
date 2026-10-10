@@ -1,0 +1,82 @@
+{
+  "instance_id": 44,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "a4c4b90",
+  "status": "completed",
+  "eval_success": 0,
+  "eval_detail": "2 / 3",
+  "eval_returncode": 0,
+  "eval_stdout_tail": "(0, '2 / 3')\n",
+  "eval_stderr_tail": "",
+  "final_answer": "Produced the required JSON file:\n\n`pred_results/imu_pred.json`\n\nComputed sleep endpoints using BioPsyKit `sleep_processing_pipeline.predict_pipeline_acceleration()`:\n\n- `sleep_onset`: `2019-09-03 02:07:18+02:00`\n- `wake_onset`: `2019-09-03 07:00:18+02:00`\n- `total_sleep_duration`: `311`\n\nThe result file was saved successfully at the required path.",
+  "token_usage": {
+    "prompt": 54121,
+    "completion": 5288
+  },
+  "wall_s": 101.895,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 1,
+      "exec_status": "error"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 3,
+      "kind": "code",
+      "script": "step_03.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 4,
+      "kind": "code",
+      "script": "step_04.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 5,
+      "kind": "code",
+      "script": "step_05.py",
+      "exit_code": 1,
+      "exec_status": "error"
+    },
+    {
+      "step": 6,
+      "kind": "code",
+      "script": "step_06.py",
+      "exit_code": 1,
+      "exec_status": "error"
+    },
+    {
+      "step": 7,
+      "kind": "code",
+      "script": "step_07.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 8,
+      "kind": "code",
+      "script": "step_08.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 9,
+      "kind": "final"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

@@ -1,0 +1,54 @@
+{
+  "instance_id": 92,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "a4c4b90",
+  "status": "completed",
+  "eval_success": 1,
+  "eval_detail": "N/A",
+  "eval_returncode": 0,
+  "eval_stdout_tail": "(1, 'N/A')\n",
+  "eval_stderr_tail": "",
+  "final_answer": "Produced the required JSON dictionary of JNMF importance/error factors and saved it to:\n\n`pred_results/jnmf_h_importances.json`\n\nComputed scores:\n- common error: `0.019074017463533988`\n- common importance: `0.6769477302939783`\n- high importance: `0.2983605570114919`\n- low importance: `0.3425926412464023`\n- distinct error: `0.005405837429051289`\n- distinct importance: `0.32305226970602163`",
+  "token_usage": {
+    "prompt": 12631,
+    "completion": 2094
+  },
+  "wall_s": 22.629,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 1,
+      "exec_status": "error"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 3,
+      "kind": "code",
+      "script": "step_03.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 4,
+      "kind": "code",
+      "script": "step_04.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 5,
+      "kind": "final"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

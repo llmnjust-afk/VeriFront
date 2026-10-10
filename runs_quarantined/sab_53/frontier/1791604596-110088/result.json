@@ -1,0 +1,54 @@
+{
+  "instance_id": 53,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "a4c4b90",
+  "status": "completed",
+  "eval_success": 1,
+  "eval_detail": "land cover: 0.9582616830360207; protected status: 1.0",
+  "eval_returncode": 0,
+  "eval_stdout_tail": "(1, 'land cover: 0.9582616830360207; protected status: 1.0')\n",
+  "eval_stderr_tail": "",
+  "final_answer": "Produced the standardized/reclassified mountain lion habitat categorical rasters using the provided lookup dictionaries.\n\nSaved outputs:\n- `pred_results/landCover_reclassified.tif`\n- `pred_results/protected_status_reclassified.tif`\n\nKey details:\n- Source rasters: `benchmark/datasets/MountainLionNew/landCover.tif` and `benchmark/datasets/MountainLionNew/Protected_Status.tif`\n- CRS preserved: `EPSG:26911`\n- Dimensions preserved: `3062 x 2494`\n- Output dtype: `uint8`\n- Land cover output values include classes `1, 2, 3, 4, 6, 7, 8, 9, 10`, plus `255` for unmapped original value `0`\n- Protected status output values: `1, 3, 6, 9, 10`\n\nRequired output file exists at:\n`pred_results/landCover_reclassified.tif`",
+  "token_usage": {
+    "prompt": 19917,
+    "completion": 4059
+  },
+  "wall_s": 42.837,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 1,
+      "exec_status": "error"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 1,
+      "exec_status": "error"
+    },
+    {
+      "step": 3,
+      "kind": "code",
+      "script": "step_03.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 4,
+      "kind": "code",
+      "script": "step_04.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 5,
+      "kind": "final"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

@@ -1,0 +1,4 @@
+config,n_train,n_pos,n_neg,best_cv_balanced_accuracy,selected_fold_balanced_accuracy_mean,selected_fold_accuracy_mean,selected_fold_roc_auc_mean,best_params,out_path
+MCNC,401,174,227,0.7562197052734138,0.7366739739374011,0.7480864197530864,0.837500629237202,"{'max_depth': None, 'min_samples_leaf': 1, 'min_samples_split': 2, 'n_estimators': 500}",pred_results/MCNC_RF.csv
+MCLCNC,661,434,227,0.7181303534279373,0.6980788675429727,0.7428115743905218,0.7786351397944438,"{'max_depth': 10, 'min_samples_leaf': 1, 'min_samples_split': 2, 'n_estimators': 500}",pred_results/MCLCNC_RF.csv
+all,923,434,489,0.7185346578052842,0.7065465849366062,0.7053231492361928,0.7835728505970961,"{'max_depth': None, 'min_samples_leaf': 2, 'min_samples_split': 5, 'n_estimators': 500}",pred_results/all_RF.csv

@@ -1,0 +1,58 @@
+{
+  "instance_id": 60,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "8e856c2",
+  "status": "completed",
+  "eval_success": 0,
+  "eval_detail": "",
+  "final_answer": "Produced the required evaluation CSV:\n\n`pred_results/accuracies.csv`\n\nThe file contains 2,235 rows with columns:\n\n- `model`\n- `nvc`\n- `task`\n- `prediction`\n- `plain_prediction`\n- `truth`\n- `improvement`\n- `hit_model`\n- `hit_nvc`\n\nValidation confirmed:\n\n- 7 models evaluated\n- 5 NVC rules evaluated\n- 64 syllogistic tasks represented\n- `improvement = hit_nvc - hit_model` for all rows\n\nOverall benchmark results:\n\n- Mean base model accuracy: `0.363050`\n- Mean NVC-rule accuracy: `0.486055`\n- Mean improvement: `0.123005`\n\nThe output file was saved successfully at:\n\n`pred_results/accuracies.csv`",
+  "token_usage": {
+    "prompt": 25525,
+    "completion": 3600
+  },
+  "wall_s": 41.436,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 3,
+      "kind": "code",
+      "script": "step_03.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 4,
+      "kind": "code",
+      "script": "step_04.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 5,
+      "kind": "code",
+      "script": "step_05.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 6,
+      "kind": "final"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

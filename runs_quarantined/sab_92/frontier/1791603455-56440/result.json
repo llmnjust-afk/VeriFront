@@ -1,0 +1,54 @@
+{
+  "instance_id": 92,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "a4c4b90",
+  "status": "completed",
+  "eval_success": 0,
+  "eval_detail": "eval_crash (no verdict line; see stdout/stderr tails)",
+  "eval_returncode": 1,
+  "eval_stdout_tail": "",
+  "eval_stderr_tail": "Traceback (most recent call last):\n  File \"/data/lab/sab_data/benchmark_verified/benchmark/eval_programs/eval_h_importances.py\", line 19, in <module>\n    print(eval())\n  File \"/data/lab/sab_data/benchmark_verified/benchmark/eval_programs/eval_h_importances.py\", line 14, in eval\n    if abs(gold_dict[key]-prediction[key]) > 1e-4:\nKeyError: 'common error'\n",
+  "final_answer": "Produced the required JSON dictionary of JNMF importance/error factors and saved it to:\n\n`pred_results/jnmf_h_importances.json`\n\nComputed values:\n```json\n{\n  \"common_error\": 0.019074017463533988,\n  \"common_importance\": 0.6769477302939783,\n  \"distinct_error\": 0.005405837429051289,\n  \"distinct_importance\": 0.32305226970602163,\n  \"high_importance\": 0.2983605570114919,\n  \"low_importance\": 0.3425926412464023\n}\n```",
+  "token_usage": {
+    "prompt": 16752,
+    "completion": 2969
+  },
+  "wall_s": 28.853,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 1,
+      "exec_status": "error"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 1,
+      "exec_status": "error"
+    },
+    {
+      "step": 3,
+      "kind": "code",
+      "script": "step_03.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 4,
+      "kind": "code",
+      "script": "step_04.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 5,
+      "kind": "final"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

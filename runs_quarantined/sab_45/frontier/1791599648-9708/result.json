@@ -1,0 +1,61 @@
+{
+  "instance_id": 45,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "0fb05fc",
+  "status": "completed",
+  "eval_success": 1,
+  "eval_detail": "12 / 12",
+  "eval_returncode": 0,
+  "eval_stdout_tail": "(1, '12 / 12')\n",
+  "eval_stderr_tail": "",
+  "final_answer": "Produced the required PSS scoring CSV at:\n\n`pred_results/questionnaire_pred.csv`\n\nIt contains 13 rows and 4 headerless columns:\n1. subject\n2. perceived helplessness\n3. perceived self-efficacy\n4. total PSS score\n\nScores were computed using PSS-10 scoring:\n- Perceived Helplessness: items 1, 2, 3, 6, 9, 10\n- Perceived Self-Efficacy: items 4, 5, 7, 8 reverse-scored on the 0–4 scale\n- Total PSS = Helplessness + reverse-scored Self-Efficacy\n\nKey output values:\n- Vp01: 14, 7, 21\n- Vp02: 5, 5, 10\n- Vp03: 14, 10, 24\n- Vp04: 11, 6, 17\n- Vp05: 8, 5, 13\n- Vp06: 10, 4, 14\n- Vp07: 7, 5, 12\n- Vp08: 17, 10, 27\n- Vp09: 14, 3, 17\n- Vp10: 5, 5, 10\n- Vp11: 8, 7, 15\n- Vp13: 15, 9, 24\n- Vp14: 5, 3, 8",
+  "token_usage": {
+    "prompt": 28203,
+    "completion": 3275
+  },
+  "wall_s": 42.27,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 1,
+      "exec_status": "error"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 1,
+      "exec_status": "error"
+    },
+    {
+      "step": 3,
+      "kind": "code",
+      "script": "step_03.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 4,
+      "kind": "code",
+      "script": "step_04.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 5,
+      "kind": "code",
+      "script": "step_05.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 6,
+      "kind": "final"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

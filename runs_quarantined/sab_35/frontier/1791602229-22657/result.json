@@ -1,0 +1,82 @@
+{
+  "instance_id": 35,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "a4c4b90",
+  "status": "completed",
+  "eval_success": 1,
+  "eval_detail": "12 / 20",
+  "eval_returncode": 0,
+  "eval_stdout_tail": "(1, '12 / 20')\n",
+  "eval_stderr_tail": "",
+  "final_answer": "RRV analysis was completed for `benchmark/datasets/biosignals/bio_eventrelated_100hz.csv` using the 100 Hz RSP signal.\n\nProduced file:\n`pred_results/rrv_analysis_pred.csv`\n\nKey extracted features:\n- Signal duration: 149.0 s\n- Inhalation events / RSP troughs: 40\n- Exhalation peaks: 40\n- Respiratory-rate local maxima: 13\n- Mean respiratory rate: saved in `RSP_Rate_Mean`\n- Main RRV indices saved include:\n  - Time domain: `RRV_RMSSD`, `RRV_MeanBB`, `RRV_SDBB`, `RRV_SDSD`, `RRV_CVBB`, `RRV_CVSD`, `RRV_MedianBB`, `RRV_MadBB`\n  - Frequency domain: `RRV_VLF`, `RRV_LF`, `RRV_HF`, `RRV_LFHF`, `RRV_LFn`, `RRV_HFn`\n  - Nonlinear: `RRV_SD1`, `RRV_SD2`, `RRV_SD2SD1`, `RRV_ApEn`, `RRV_SampEn`\n\nSelected key values:\n- `RRV_RMSSD`: 1636.437884\n- `RRV_MeanBB`: 3537.948718 ms\n- `RRV_SDBB`: 1165.046147\n- `RRV_LF`: 0.025954\n- `RRV_HF`: 0.000693\n- `RRV_LFHF`: 37.456848\n- `RRV_SD1`: 1172.654479\n- `RRV_SD2`: 1157.387800\n- `RRV_ApEn`: 0.545669\n- `RRV_SampEn`: 1.116004\n\nThe CSV contains one row with 56 columns, including cleaned-signal summary statistics, inhalation/exhalation peak indices, respiratory-rate peak indices and values, breath intervals, RRV metrics, respiratory amplitude variability metrics, RVT, and respiratory phase/symmetry features.",
+  "token_usage": {
+    "prompt": 55220,
+    "completion": 5198
+  },
+  "wall_s": 67.62,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 1,
+      "exec_status": "error"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 3,
+      "kind": "code",
+      "script": "step_03.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 4,
+      "kind": "code",
+      "script": "step_04.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 5,
+      "kind": "code",
+      "script": "step_05.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 6,
+      "kind": "code",
+      "script": "step_06.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 7,
+      "kind": "code",
+      "script": "step_07.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 8,
+      "kind": "code",
+      "script": "step_08.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 9,
+      "kind": "final"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

@@ -1,0 +1,40 @@
+{
+  "instance_id": 34,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "a4c4b90",
+  "status": "completed",
+  "eval_success": 0,
+  "eval_detail": "57 / 91",
+  "eval_returncode": 0,
+  "eval_stdout_tail": "(0, '57 / 91')\n",
+  "eval_stderr_tail": "",
+  "final_answer": "Produced the required HRV feature file:\n\n`pred_results/hrv_analysis_pred.csv`\n\nKey processing details:\n- Input used: `benchmark/datasets/biosignals/bio_resting_5min_100hz.csv`\n- ECG sampling rate: 100 Hz\n- Signal duration: 299.00 s\n- Method: NeuroKit2 ECG cleaning, R-peak detection, and HRV extraction\n- Detected ECG R-peaks: 432\n- Mean RR interval: 692.436 ms\n- RR SD: 48.841 ms\n- Mean heart rate: approximately 86.65 bpm\n- Output feature table shape: 1 row × 96 columns\n\nThe saved CSV includes time-domain, frequency-domain, and non-linear HRV indices, including metrics such as MeanNN, SDNN, RMSSD, pNN20/pNN50, LF/HF band powers, LF/HF ratio, SD1/SD2, DFA, entropy/fractal-related measures, and related NeuroKit2 HRV features.\n\nAn auxiliary file with detected R-peak sample indices was also saved at:\n\n`pred_results/hrv_detected_rpeaks_samples.csv`",
+  "token_usage": {
+    "prompt": 16735,
+    "completion": 8501
+  },
+  "wall_s": 69.267,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 1,
+      "exec_status": "error"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 3,
+      "kind": "final"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

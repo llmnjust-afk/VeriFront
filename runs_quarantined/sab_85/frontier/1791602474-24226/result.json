@@ -1,0 +1,61 @@
+{
+  "instance_id": 85,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "a4c4b90",
+  "status": "completed",
+  "eval_success": 0,
+  "eval_detail": "N/A",
+  "eval_returncode": 0,
+  "eval_stdout_tail": "(0, 'N/A')\n",
+  "eval_stderr_tail": "",
+  "final_answer": "Computed saliva standard statistical features for each subject and saved them to:\n\npred_results/saliva_pred.json\n\nOutput contents:\n- 22 subject entries total\n- 11 Control subjects\n- 11 Intervention subjects\n- For each subject:\n  - condition\n  - argmax\n  - mean\n  - std\n  - skew\n  - kurt\n\nFeature summary across subjects:\n- mean cortisol average: 6.094378\n- std average: 1.723844\n- skew average: 0.078165\n- kurtosis average: -0.677276\n\nThe required JSON file was successfully written at the exact requested path.",
+  "token_usage": {
+    "prompt": 17211,
+    "completion": 3039
+  },
+  "wall_s": 35.42,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 1,
+      "exec_status": "error"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 3,
+      "kind": "code",
+      "script": "step_03.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 4,
+      "kind": "code",
+      "script": "step_04.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 5,
+      "kind": "code",
+      "script": "step_05.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 6,
+      "kind": "final"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

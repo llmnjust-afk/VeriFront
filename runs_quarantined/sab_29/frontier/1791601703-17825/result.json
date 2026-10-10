@@ -1,0 +1,61 @@
+{
+  "instance_id": 29,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "a4c4b90",
+  "status": "completed",
+  "eval_success": 0,
+  "eval_detail": "13 / 16",
+  "eval_returncode": 0,
+  "eval_stdout_tail": "(0, '13 / 16')\n",
+  "eval_stderr_tail": "",
+  "final_answer": "Produced the required CSV file:\n\npred_results/bio_eventrelated_100hz_analysis_pred.csv\n\nIt contains 4 localized event rows with columns:\nCondition, ECG_Rate_Mean, RSP_Rate_Mean, EDA_Peak_Amplitude\n\nLocalized events:\n- Negative at sample 1017, duration 297 samples\n- Neutral at sample 4916, duration 300 samples\n- Neutral at sample 9160, duration 299 samples\n- Negative at sample 12896, duration 297 samples\n\nSaved feature values:\n- Negative: ECG_Rate_Mean = -1.721911, RSP_Rate_Mean = -0.015075, EDA_Peak_Amplitude = -0.407865\n- Neutral: ECG_Rate_Mean = -4.107394, RSP_Rate_Mean = 0.151748, EDA_Peak_Amplitude = 0.414120\n- Neutral: ECG_Rate_Mean = 1.024047, RSP_Rate_Mean = -0.323116, EDA_Peak_Amplitude = 0.018872\n- Negative: ECG_Rate_Mean = -2.527055, RSP_Rate_Mean = 0.025023, EDA_Peak_Amplitude = 1.059617",
+  "token_usage": {
+    "prompt": 28761,
+    "completion": 4907
+  },
+  "wall_s": 62.207,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 1,
+      "exec_status": "error"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 3,
+      "kind": "code",
+      "script": "step_03.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 4,
+      "kind": "code",
+      "script": "step_04.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 5,
+      "kind": "code",
+      "script": "step_05.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 6,
+      "kind": "final"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

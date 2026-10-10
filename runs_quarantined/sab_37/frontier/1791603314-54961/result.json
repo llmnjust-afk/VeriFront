@@ -1,0 +1,68 @@
+{
+  "instance_id": 37,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "a4c4b90",
+  "status": "completed",
+  "eval_success": 1,
+  "eval_detail": "3 / 3",
+  "eval_returncode": 0,
+  "eval_stdout_tail": "(1, '3 / 3')\n",
+  "eval_stderr_tail": "",
+  "final_answer": "Produced the required CFT parameter JSON file:\n\n`pred_results/cft_pred_results.json`\n\nContents:\n```json\n{\n  \"baseline_hr\": 96.87033705099753,\n  \"onset_hr\": 89.82456140350877,\n  \"onset_hr_percent\": 7.2734088287310374\n}\n```\n\nThe MIST3 sheet was loaded from `benchmark/datasets/mist_hr/hr_sample_mist.xlsx` and contained 350 rows of heart-rate data.",
+  "token_usage": {
+    "prompt": 21544,
+    "completion": 2807
+  },
+  "wall_s": 37.911,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 1,
+      "exec_status": "error"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 3,
+      "kind": "code",
+      "script": "step_03.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 4,
+      "kind": "code",
+      "script": "step_04.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 5,
+      "kind": "code",
+      "script": "step_05.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 6,
+      "kind": "code",
+      "script": "step_06.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 7,
+      "kind": "final"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

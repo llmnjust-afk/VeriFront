@@ -1,0 +1,54 @@
+{
+  "instance_id": 18,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "a4c4b90",
+  "status": "completed",
+  "eval_success": 0,
+  "eval_detail": "{'data_correctness': True, 'func_correctness': False}",
+  "eval_returncode": 0,
+  "eval_stdout_tail": "(0, \"{'data_correctness': True, 'func_correctness': False}\")\n",
+  "eval_stderr_tail": "",
+  "final_answer": "Produced Random Forest DILI prediction files using Morgan fingerprints, 5-fold stratified cross-validation, and grid-search hyperparameter tuning.\n\nRequired output saved:\n- pred_results/MCNC_RF.csv\n\nAdditional outputs saved:\n- pred_results/MCLCNC_RF.csv\n- pred_results/all_RF.csv\n- pred_results/RF_training_summary.csv\n\nKey results:\n- MCNC: 401 training compounds, best CV balanced accuracy = 0.7562, best params = n_estimators=500, max_depth=None, min_samples_split=2, min_samples_leaf=1\n  - Test predictions: 23 DILI, 32 NoDILI\n- MCLCNC: 661 training compounds, best CV balanced accuracy = 0.7181, best params = n_estimators=500, max_depth=10, min_samples_split=2, min_samples_leaf=1\n  - Test predictions: 40 DILI, 15 NoDILI\n- all: 923 training compounds, best CV balanced accuracy = 0.7185, best params = n_estimators=500, max_depth=None, min_samples_split=5, min_samples_leaf=2\n  - Test predictions: 32 DILI, 23 NoDILI\n\nThe required CSV has columns:\n- standardised_smiles\n- label",
+  "token_usage": {
+    "prompt": 18077,
+    "completion": 3814
+  },
+  "wall_s": 125.436,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 3,
+      "kind": "code",
+      "script": "step_03.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 4,
+      "kind": "code",
+      "script": "step_04.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 5,
+      "kind": "final"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

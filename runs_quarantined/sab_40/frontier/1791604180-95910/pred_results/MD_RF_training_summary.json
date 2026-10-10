@@ -1,0 +1,251 @@
+{
+  "MCNC": {
+    "n_train": 401,
+    "class_counts": {
+      "NoDILI": 227,
+      "DILI": 174
+    },
+    "validation_balanced_accuracy": 0.7723285486443381,
+    "train_balanced_accuracy_diagnostic": 0.9977973568281938,
+    "best_params": {
+      "n_estimators": 300,
+      "max_features": 0.35,
+      "max_depth": 16,
+      "min_samples_leaf": 2,
+      "class_weight": "balanced"
+    },
+    "all_candidate_scores": [
+      {
+        "balanced_accuracy": 0.7687400318979267,
+        "params": {
+          "n_estimators": 250,
+          "max_features": "sqrt",
+          "max_depth": null,
+          "min_samples_leaf": 1,
+          "class_weight": "balanced_subsample"
+        }
+      },
+      {
+        "balanced_accuracy": 0.7460127591706539,
+        "params": {
+          "n_estimators": 250,
+          "max_features": "sqrt",
+          "max_depth": 20,
+          "min_samples_leaf": 1,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "balanced_accuracy": 0.7573763955342903,
+        "params": {
+          "n_estimators": 300,
+          "max_features": 0.25,
+          "max_depth": null,
+          "min_samples_leaf": 2,
+          "class_weight": "balanced_subsample"
+        }
+      },
+      {
+        "balanced_accuracy": 0.7661483253588517,
+        "params": {
+          "n_estimators": 200,
+          "max_features": "log2",
+          "max_depth": null,
+          "min_samples_leaf": 1,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "balanced_accuracy": 0.7723285486443381,
+        "params": {
+          "n_estimators": 300,
+          "max_features": 0.35,
+          "max_depth": 16,
+          "min_samples_leaf": 2,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "balanced_accuracy": 0.7486044657097288,
+        "params": {
+          "n_estimators": 200,
+          "max_features": "sqrt",
+          "max_depth": 10,
+          "min_samples_leaf": 4,
+          "class_weight": "balanced"
+        }
+      }
+    ],
+    "test_prediction_counts": {
+      "NoDILI": 34,
+      "DILI": 21
+    },
+    "output": "pred_results/MD_MCNC_RF.csv"
+  },
+  "MCLCNC": {
+    "n_train": 661,
+    "class_counts": {
+      "DILI": 434,
+      "NoDILI": 227
+    },
+    "validation_balanced_accuracy": 0.715274424593594,
+    "train_balanced_accuracy_diagnostic": 0.9732637690574311,
+    "best_params": {
+      "n_estimators": 200,
+      "max_features": "sqrt",
+      "max_depth": 10,
+      "min_samples_leaf": 4,
+      "class_weight": "balanced"
+    },
+    "all_candidate_scores": [
+      {
+        "balanced_accuracy": 0.6734266859810075,
+        "params": {
+          "n_estimators": 250,
+          "max_features": "sqrt",
+          "max_depth": null,
+          "min_samples_leaf": 1,
+          "class_weight": "balanced_subsample"
+        }
+      },
+      {
+        "balanced_accuracy": 0.6955577015934331,
+        "params": {
+          "n_estimators": 250,
+          "max_features": "sqrt",
+          "max_depth": 20,
+          "min_samples_leaf": 1,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "balanced_accuracy": 0.7039272493159505,
+        "params": {
+          "n_estimators": 300,
+          "max_features": 0.25,
+          "max_depth": null,
+          "min_samples_leaf": 2,
+          "class_weight": "balanced_subsample"
+        }
+      },
+      {
+        "balanced_accuracy": 0.6692419121197489,
+        "params": {
+          "n_estimators": 200,
+          "max_features": "log2",
+          "max_depth": null,
+          "min_samples_leaf": 1,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "balanced_accuracy": 0.6855786254627394,
+        "params": {
+          "n_estimators": 300,
+          "max_features": 0.35,
+          "max_depth": 16,
+          "min_samples_leaf": 2,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "balanced_accuracy": 0.715274424593594,
+        "params": {
+          "n_estimators": 200,
+          "max_features": "sqrt",
+          "max_depth": 10,
+          "min_samples_leaf": 4,
+          "class_weight": "balanced"
+        }
+      }
+    ],
+    "test_prediction_counts": {
+      "DILI": 42,
+      "NoDILI": 13
+    },
+    "output": "pred_results/MD_MCLCNC_RF.csv"
+  },
+  "all": {
+    "n_train": 923,
+    "class_counts": {
+      "NoDILI": 489,
+      "DILI": 434
+    },
+    "validation_balanced_accuracy": 0.6996164836817567,
+    "train_balanced_accuracy_diagnostic": 0.9979550102249488,
+    "best_params": {
+      "n_estimators": 300,
+      "max_features": 0.25,
+      "max_depth": null,
+      "min_samples_leaf": 2,
+      "class_weight": "balanced_subsample"
+    },
+    "all_candidate_scores": [
+      {
+        "balanced_accuracy": 0.6930741464881938,
+        "params": {
+          "n_estimators": 250,
+          "max_features": "sqrt",
+          "max_depth": null,
+          "min_samples_leaf": 1,
+          "class_weight": "balanced_subsample"
+        }
+      },
+      {
+        "balanced_accuracy": 0.6945405324108889,
+        "params": {
+          "n_estimators": 250,
+          "max_features": "sqrt",
+          "max_depth": 20,
+          "min_samples_leaf": 1,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "balanced_accuracy": 0.6996164836817567,
+        "params": {
+          "n_estimators": 300,
+          "max_features": 0.25,
+          "max_depth": null,
+          "min_samples_leaf": 2,
+          "class_weight": "balanced_subsample"
+        }
+      },
+      {
+        "balanced_accuracy": 0.6894645811400211,
+        "params": {
+          "n_estimators": 200,
+          "max_features": "log2",
+          "max_depth": null,
+          "min_samples_leaf": 1,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "balanced_accuracy": 0.678147089787938,
+        "params": {
+          "n_estimators": 300,
+          "max_features": 0.35,
+          "max_depth": 16,
+          "min_samples_leaf": 2,
+          "class_weight": "balanced"
+        }
+      },
+      {
+        "balanced_accuracy": 0.6899533764475861,
+        "params": {
+          "n_estimators": 200,
+          "max_features": "sqrt",
+          "max_depth": 10,
+          "min_samples_leaf": 4,
+          "class_weight": "balanced"
+        }
+      }
+    ],
+    "test_prediction_counts": {
+      "DILI": 30,
+      "NoDILI": 25
+    },
+    "output": "pred_results/MD_all_RF.csv"
+  }
+}

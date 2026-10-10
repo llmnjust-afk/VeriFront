@@ -1,0 +1,68 @@
+{
+  "instance_id": 67,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "a4c4b90",
+  "status": "completed",
+  "eval_success": 1,
+  "eval_detail": "14 / 14",
+  "eval_returncode": 0,
+  "eval_stdout_tail": "(1, '14 / 14')\n",
+  "eval_stderr_tail": "",
+  "final_answer": "Produced the required similarity-score CSV for all seven cognitive models.\n\nOutput saved to:\n`pred_results/CogSci_pattern_high_sim_data_pred.csv`\n\nComputed cosine similarities:\n\n| Model | conscientiousness | openness |\n|---|---:|---:|\n| Atmosphere | 0.522860 | 0.112792 |\n| Conversion | 0.149230 | 0.732571 |\n| Matching | 0.669871 | 0.053331 |\n| MMT | 0.488519 | 0.521729 |\n| PHM | 0.493059 | 0.116266 |\n| PSYCOP | 0.077551 | 0.805185 |\n| VerbalModels | 0.212520 | 0.645598 |",
+  "token_usage": {
+    "prompt": 30459,
+    "completion": 4206
+  },
+  "wall_s": 124.881,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 1,
+      "exec_status": "error"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 3,
+      "kind": "code",
+      "script": "step_03.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 4,
+      "kind": "code",
+      "script": "step_04.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 5,
+      "kind": "code",
+      "script": "step_05.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 6,
+      "kind": "code",
+      "script": "step_06.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 7,
+      "kind": "final"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

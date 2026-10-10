@@ -1,0 +1,40 @@
+{
+  "instance_id": 53,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "a4c4b90",
+  "status": "completed",
+  "eval_success": 1,
+  "eval_detail": "land cover: 0.9793139066090426; protected status: 1.0",
+  "eval_returncode": 0,
+  "eval_stdout_tail": "(1, 'land cover: 0.9793139066090426; protected status: 1.0')\n",
+  "eval_stderr_tail": "",
+  "final_answer": "Produced the standardized categorical raster outputs using the provided reclassification dictionaries.\n\nSaved files:\n- `pred_results/landCover_reclassified.tif`\n- `pred_results/protected_status_reclassified.tif`\n\nKey output checks:\n- `landCover_reclassified.tif`\n  - CRS: `EPSG:26911`\n  - Shape: `(2494, 3062)`\n  - Data type: `uint8`\n  - Reclassified values/counts: `0:160768, 1:311867, 2:322251, 3:4048965, 4:99788, 6:234499, 7:641523, 8:1447851, 9:176973, 10:192143`\n  - Note: source land cover value `0` was not in the supplied classification and was preserved as default/background `0`.\n\n- `protected_status_reclassified.tif`\n  - CRS: `EPSG:26911`\n  - Shape: `(2494, 3062)`\n  - Data type: `uint8`\n  - Reclassified values/counts: `1:721920, 3:810037, 6:354610, 9:1770781, 10:3979280`\n\nRequired output exists at:\n- `pred_results/landCover_reclassified.tif`",
+  "token_usage": {
+    "prompt": 10229,
+    "completion": 4028
+  },
+  "wall_s": 37.53,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 1,
+      "exec_status": "error"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 3,
+      "kind": "final"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

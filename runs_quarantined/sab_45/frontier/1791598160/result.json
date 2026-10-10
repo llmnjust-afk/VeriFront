@@ -1,0 +1,58 @@
+{
+  "instance_id": 45,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "8e856c2",
+  "status": "completed",
+  "eval_success": 1,
+  "eval_detail": "12 / 12",
+  "final_answer": "Produced the required PSS scoring CSV.\n\nSaved file:\n`pred_results/questionnaire_pred.csv`\n\nOutput format:\n`subject, perceived_helplessness, perceived_self_efficacy, total_pss`\n\nNo header was written, as required.\n\nKey details:\n- Loaded questionnaire data from `benchmark/datasets/biopsykit_questionnaire_data/questionnaire_data.pkl`\n- Processed 13 subjects\n- PSS item range observed: 0 to 4\n- PSS-10 scoring used:\n  - Perceived helplessness: PSS items 1, 2, 3, 6, 9, 10 summed directly\n  - Perceived self-efficacy: PSS items 4, 5, 7, 8 reverse-scored and summed\n  - Total PSS: sum of both subscales\n\nFirst rows saved:\n```csv\nVp01,14,7,21\nVp02,5,5,10\nVp03,14,10,24\nVp04,11,6,17\nVp05,8,5,13\n```",
+  "token_usage": {
+    "prompt": 23518,
+    "completion": 4960
+  },
+  "wall_s": 55.254,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 1,
+      "exec_status": "error"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 3,
+      "kind": "code",
+      "script": "step_03.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 4,
+      "kind": "code",
+      "script": "step_04.py",
+      "exit_code": 1,
+      "exec_status": "error"
+    },
+    {
+      "step": 5,
+      "kind": "code",
+      "script": "step_05.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 6,
+      "kind": "final"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}

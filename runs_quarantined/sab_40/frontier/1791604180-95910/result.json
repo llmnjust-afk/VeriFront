@@ -1,0 +1,89 @@
+{
+  "instance_id": 40,
+  "arm": "frontier",
+  "model_id": "gpt-5.5-2026-04-23",
+  "snapshot": "gpt-5.5-2026-04-23",
+  "agent_commit": "a4c4b90",
+  "status": "completed",
+  "eval_success": 0,
+  "eval_detail": "Mean F1: 0.7164285714285715",
+  "eval_returncode": 0,
+  "eval_stdout_tail": "(0, 'Mean F1: 0.7164285714285715')\n",
+  "eval_stderr_tail": "",
+  "final_answer": "Random forest DILI prediction files were generated successfully in `pred_results/`.\n\nRequired output:\n- `pred_results/MD_MCNC_RF.csv`\n\nAlso produced:\n- `pred_results/MD_MCLCNC_RF.csv`\n- `pred_results/MD_all_RF.csv`\n- label-only inspection sidecars for each split\n- `pred_results/MD_RF_training_summary.json`\n\nKey MCNC results:\n- Training rows: 401\n- Class counts: `NoDILI=227`, `DILI=174`\n- Best validation balanced accuracy: `0.7723`\n- Best RF parameters:\n  - `n_estimators=300`\n  - `max_features=0.35`\n  - `max_depth=16`\n  - `min_samples_leaf=2`\n  - `class_weight='balanced'`\n- Test prediction counts in `MD_MCNC_RF.csv`:\n  - `NoDILI`: 34\n  - `DILI`: 21\n\nThe required CSV has shape `(55, 1177)` and includes the requested final `label` column with predicted labels `DILI` or `NoDILI`.",
+  "token_usage": {
+    "prompt": 187673,
+    "completion": 7222
+  },
+  "wall_s": 414.119,
+  "steps": [
+    {
+      "step": 1,
+      "kind": "code",
+      "script": "step_01.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 2,
+      "kind": "code",
+      "script": "step_02.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 3,
+      "kind": "code",
+      "script": "step_03.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 4,
+      "kind": "code",
+      "script": "step_04.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 5,
+      "kind": "code",
+      "script": "step_05.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 6,
+      "kind": "code",
+      "script": "step_06.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 7,
+      "kind": "code",
+      "script": "step_07.py",
+      "exit_code": null,
+      "exec_status": "timeout"
+    },
+    {
+      "step": 8,
+      "kind": "code",
+      "script": "step_08.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 9,
+      "kind": "code",
+      "script": "step_09.py",
+      "exit_code": 0,
+      "exec_status": "ok"
+    },
+    {
+      "step": 10,
+      "kind": "final"
+    }
+  ],
+  "usd_cost": "TBD (relay pricing not pinned)"
+}
