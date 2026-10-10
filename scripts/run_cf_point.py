@@ -135,12 +135,18 @@ def main() -> int:
     ev = run_eval(paths, eval_script, args.python_bin)
 
     fr = cfg["frontier"]
+    edit_parsed = None
+    for evd in run.trajectory.events:
+        if evd.event_type == "agent_message" and (evd.extra or {}).get("is_cf_edit_step"):
+            edit_parsed = (evd.extra or {}).get("parsed_action")
+            break
     meta = {
         "instance_id": instance_id, "arm": f"cf_{args.arm}",
         "edit_step": args.at_step, "edit_model": args.edit_model,
         "edit_model_snapshot": args.edit_model_snapshot,
         "parent_run": str(parent), "parent_outcome": parent_result["eval_success"],
         "replay_fidelity": fidelity, "cf_status": run.status, "cf_steps": run.steps,
+        "edit_step_parsed_action": edit_parsed,
     }
     summary = {
         "instance_id": instance_id, "status": run.status,

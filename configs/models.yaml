@@ -16,6 +16,27 @@ frontier:
     per_1m_ca: {prompt: 35, completion: 210}
     per_1m_usd: {prompt: 4.90, completion: 29.37}
     ladder_threshold_tokens: 272000
+edit_models:   # P1-CF small-model replacers via same relay (selected 2026-10-10; smoke OK)
+  - name: api-mini-gpt54
+    family: gpt                # same family as frontier (gpt-5.x lineage)
+    model_id: gpt-5.4-mini-2026-03-17
+    snapshot: gpt-5.4-mini-2026-03-17
+    base_url_env: FRONTIER_BASE_URL
+    api_key_env: FRONTIER_API_KEY
+    role_probe: "CF0 smoke + CF0/CF1 replacement runs (12/12, 3/3 passes)"
+    price:
+      per_1m_ca: {prompt: 5.25, completion: 31.5}   # 2026-10-10 price list, flat (no ladder)
+      per_1m_usd: {prompt: 0.73, completion: 4.41}
+  - name: api-deepseek-v32
+    family: deepseek            # cross-family control
+    model_id: deepseek-v3.2
+    snapshot: deepseek-v3.2
+    base_url_env: FRONTIER_BASE_URL
+    api_key_env: FRONTIER_API_KEY
+    role_probe: "CF0 smoke + CF0/CF1 replacement runs; returns reasoning tokens; CF1 60s08 pass1 premature-final -> eval_crash (failure mode: protocol, not capability)"
+    price:
+      per_1m_ca: null            # TBD: compute empirically from billing delta over CF0/CF1 runs
+      per_1m_usd: null
 local:
   - name: local-a
     family: qwen3                 # newest permissive 7-8B class (2026-10-09 HF survey)

@@ -125,6 +125,8 @@ def replay_prefix(run_dir: Path, agent: CodeActAgent,
             "obs_identical": obs_orig == obs_replay,
             "obs_diff_chars": _diff_chars(obs_orig, obs_replay),
         })
+        if obs_orig != obs_replay:
+            per_step[-1]["obs_diff_excerpt"] = _diff_excerpt(obs_orig, obs_replay)
     return {"steps": per_step,
             "manifest": file_manifest(agent.workdir),
             "all_status_match": all(p.get("orig_status") == p.get("replay_status")
@@ -137,3 +139,10 @@ def _diff_chars(a: str, b: str) -> int:
     import difflib
     sm = difflib.SequenceMatcher(None, a, b)
     return int((1 - sm.ratio()) * max(len(a), len(b)))
+
+
+def _diff_excerpt(a: str, b: str, max_chars: int = 300) -> str:
+    import difflib
+    d = list(difflib.unified_diff(a.splitlines(), b.splitlines(), lineterm=""))
+    text = "\n".join(d)
+    return text[:max_chars]
