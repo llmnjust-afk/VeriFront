@@ -60,21 +60,26 @@ def main() -> int:
                     help="frozen P1 budget (configs/sampling_p1.yaml)")
     ap.add_argument("--step-timeout", type=float, default=300.0)
     ap.add_argument("--max-tokens", type=int, default=8192)
+    ap.add_argument("--hint", default="",
+                    help="anchor hint (single clause) appended as extra_rules; "
+                         "runs go under <arm>_<label> with label='hint'")
     args = ap.parse_args()
 
+    label = "hint" if args.hint else ""
+    arm_dir = args.arm + (f"_{label}" if label else "")
     cfg = load_models_config(args.config)
     df = load_verified_tasks(args.parquet)
     row = get_task(df, args.instance_id)
     eval_script = str(row["eval_script_name"])
 
-    task_dir = Path(args.workdir_root) / f"sab_{args.instance_id}" / args.arm
+    task_dir = Path(args.workdir_root) / f"sab_{args.instance_id}" / arm_dir
     stamp = f"{int(time.time())}-{os.getpid()}"
     paths = SabTaskPaths(
         benchmark_root=Path(args.benchmark_root),
         workdir=task_dir / stamp,
     )
     prepare_workdir(paths)
-    spec = build_task_spec(row, args.instance_id)
+    spec = build_task_spec(row, args.instance_id, extra_rules=args.hint)
     client = client_from_config(args.config, args.arm)
     config = CodeActConfig(
         max_steps=args.max_steps,
@@ -91,7 +96,8 @@ def main() -> int:
     (out_dir / "trace.jsonl").write_text(traj.to_jsonl(), encoding="utf-8")
     summary = {
         "instance_id": args.instance_id,
-        "arm": args.arm,
+        "arm": arm_dir,
+        "hint": args.hint,
         "model_id": traj.meta.model_id,
         "snapshot": traj.meta.model_snapshot_or_revision,
         "agent_commit": traj.meta.agent_commit,
