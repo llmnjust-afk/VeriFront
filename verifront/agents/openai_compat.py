@@ -109,7 +109,12 @@ class OpenAICompatClient:
                     "raw": payload,
                 }
             except urllib.error.HTTPError as e:
-                last_err = e
+                err_body = ""
+                try:
+                    err_body = e.read().decode("utf-8", "replace")[:300]
+                except Exception:
+                    pass
+                last_err = ChatError(f"HTTP {e.code}: {err_body or e}") if err_body else e
                 if e.code not in _RETRY_STATUS or attempt == self.max_retries:
                     break
             except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
