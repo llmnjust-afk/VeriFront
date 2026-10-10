@@ -29,7 +29,7 @@ def main() -> int:
 
     root = Path(args.runs)
     latest = {}
-    for res in sorted(root.glob("sab_*/frontier/*/result.json")):
+    for res in sorted(root.glob("sab_*/*/*/result.json")):
         r = json.loads(res.read_text(encoding="utf-8"))
         key = (r["instance_id"], r["arm"], res.parent.name)
         latest.setdefault((r["instance_id"], r["arm"]), []).append((res.parent.name, r))

@@ -20,6 +20,7 @@ from verifront.sab.adapter import (
 def mini_benchmark(tmp_path):
     """benchmark/eval_programs/eval_toy.py compares pred vs gold CSV."""
     bench = tmp_path / "benchroot" / "benchmark"
+    (bench / "datasets").mkdir(parents=True)
     (bench / "eval_programs" / "gold_results").mkdir(parents=True)
     (bench / "eval_programs" / "eval_toy.py").write_text(
         "import pandas as pd\n"
@@ -61,9 +62,31 @@ def test_parse_eval_line():
 def test_prepare_workdir_layout(mini_benchmark, tmp_path):
     paths = SabTaskPaths(benchmark_root=mini_benchmark, workdir=tmp_path / "wd")
     prepare_workdir(paths)
-    assert (paths.workdir / "benchmark").is_symlink()
-    assert (paths.workdir / "benchmark" / "eval_programs" / "eval_toy.py").is_file()
+    # Agent view: benchmark/ is a real dir exposing ONLY datasets.
+    staged = paths.workdir / "benchmark"
+    assert staged.is_dir() and not staged.is_symlink()
+    assert (staged / "datasets").is_symlink()
+    assert not (staged / "eval_programs").exists()
+    assert not (staged / "gold_programs").exists()
     assert (paths.workdir / "pred_results").is_dir()
+
+
+def test_agent_cannot_see_protected_dirs(mini_benchmark, tmp_path):
+    paths = SabTaskPaths(benchmark_root=mini_benchmark, workdir=tmp_path / "wd")
+    prepare_workdir(paths)
+    import os as _os
+    listing = sorted(_os.listdir(paths.workdir / "benchmark"))
+    assert listing == ["datasets"], listing
+
+
+def test_eval_swaps_in_full_tree(mini_benchmark, tmp_path):
+    paths = SabTaskPaths(benchmark_root=mini_benchmark, workdir=tmp_path / "wd")
+    prepare_workdir(paths)
+    (paths.workdir / "pred_results" / "pred.csv").write_text("v\n7\n", encoding="utf-8")
+    ev = run_eval(paths, "eval_toy.py", "python3")
+    assert ev["success"] == 1, ev
+    # After eval the workdir benchmark is the full tree (eval-time requirement).
+    assert (paths.workdir / "benchmark" / "eval_programs" / "eval_toy.py").is_file()
 
 
 def test_end_to_end_toy_task(mini_benchmark, tmp_path):
