@@ -21,7 +21,8 @@ RETRY_WAIT = 420.0
 MAX_RETRY = 6
 
 
-def result_exists(runs_root: Path, task: str, step: int, arm: str, model: str) -> bool:
+def count_results(runs_root: Path, task: str, step: int, arm: str, model: str) -> int:
+    n = 0
     for f in (runs_root / f"sab_{task}" / f"cf_{arm}").glob("*/result.json"):
         try:
             r = json.loads(Path(f).read_text())
@@ -32,8 +33,12 @@ def result_exists(runs_root: Path, task: str, step: int, arm: str, model: str) -
             continue
         if (m.get("edit_model") or "") != (model or ""):
             continue
-        return True
-    return False
+        n += 1
+    return n
+
+
+def result_exists(runs_root: Path, task: str, step: int, arm: str, model: str) -> bool:
+    return count_results(runs_root, task, step, arm, model) > 0
 
 
 def main() -> int:
@@ -43,6 +48,8 @@ def main() -> int:
     ap.add_argument("--only-batch", type=int, default=0,
                     help="1-based batch index over ready points (round-robin split of 4)")
     ap.add_argument("--n-batches", type=int, default=4)
+    ap.add_argument("--min-per-arm", type=int, default=1,
+                    help="skip an arm only when it already has >= this many results")
     a = ap.parse_args()
 
     pts = [p for p in json.loads(Path(a.points).read_text())["points"] if p["ready"]]
@@ -58,7 +65,7 @@ def main() -> int:
     n_done = n_fail = 0
     abort = False
     for j, (p, arm, model, snap, rep) in enumerate(jobs, 1):
-        if result_exists(Path(a.runs_root), p["task_id"], p["step_no"], arm, model or ""):
+        if count_results(Path(a.runs_root), p["task_id"], p["step_no"], arm, model or "") >= a.min_per_arm:
             n_done += 1
             continue
         cmd = [sys.executable, "scripts/run_cf_point.py",
