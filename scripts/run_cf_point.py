@@ -59,6 +59,13 @@ def main() -> int:
     ap.add_argument("--arm", choices=["frontier_resample", "local_replace"], required=True)
     ap.add_argument("--edit-model", default=None)
     ap.add_argument("--edit-model-snapshot", default="")
+    ap.add_argument("--edit-base-url", default=None,
+                    help="override endpoint for the edit model (e.g. local vLLM); default = frontier")
+    ap.add_argument("--edit-extra-body", default=None,
+                    help="JSON object merged into every edit-model request body")
+    ap.add_argument("--edit-timeout-s", type=float, default=120.0)
+    ap.add_argument("--edit-max-tokens", type=int, default=None,
+                    help="cap max_tokens for the edit model (e.g. 4096 for 32K local ctx)")
     ap.add_argument("--python-bin", default=PYTHON_BIN_DEFAULT)
     ap.add_argument("--workdir-root", default="/tmp/vf_work")
     ap.add_argument("--artifacts-root", default=str(ROOT / "runs"))
@@ -78,10 +85,14 @@ def main() -> int:
     if args.arm == "local_replace":
         if not args.edit_model:
             raise SystemExit("--edit-model required for local_replace")
+        extra = json.loads(args.edit_extra_body) if args.edit_extra_body else None
         edit_client = OpenAICompatClient(
-            base_url=frontier_client.base_url,
+            base_url=args.edit_base_url or frontier_client.base_url,
             model=args.edit_model,
-            api_key=os.environ.get("FRONTIER_API_KEY", ""),
+            api_key="" if args.edit_base_url else os.environ.get("FRONTIER_API_KEY", ""),
+            timeout_s=args.edit_timeout_s,
+            extra_body=extra,
+            max_tokens_cap=args.edit_max_tokens,
         )
         edit_client.snapshot = args.edit_model_snapshot
 

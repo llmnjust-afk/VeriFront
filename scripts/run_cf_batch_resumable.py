@@ -21,7 +21,8 @@ RETRY_WAIT = 420.0
 MAX_RETRY = 6
 
 
-def count_results(runs_root: Path, task: str, step: int, arm: str, model: str) -> int:
+def count_results(runs_root: Path, task: str, step: int, arm: str, model: str,
+                  parent_run: str = "") -> int:
     n = 0
     for f in (runs_root / f"sab_{task}" / f"cf_{arm}").glob("*/result.json"):
         try:
@@ -32,6 +33,8 @@ def count_results(runs_root: Path, task: str, step: int, arm: str, model: str) -
         if int(m.get("edit_step", -1)) != step:
             continue
         if (m.get("edit_model") or "") != (model or ""):
+            continue
+        if parent_run and str(m.get("parent_run", "")) != str(parent_run):
             continue
         n += 1
     return n
@@ -65,7 +68,8 @@ def main() -> int:
     n_done = n_fail = 0
     abort = False
     for j, (p, arm, model, snap, rep) in enumerate(jobs, 1):
-        if count_results(Path(a.runs_root), p["task_id"], p["step_no"], arm, model or "") >= a.min_per_arm:
+        if count_results(Path(a.runs_root), p["task_id"], p["step_no"], arm, model or "",
+                         p["parent_run"]) >= a.min_per_arm:
             n_done += 1
             continue
         cmd = [sys.executable, "scripts/run_cf_point.py",

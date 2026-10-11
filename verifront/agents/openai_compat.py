@@ -37,6 +37,8 @@ class OpenAICompatClient:
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/126.0.0.0 Safari/537.36"
         ),
+        extra_body: Optional[Dict[str, Any]] = None,
+        max_tokens_cap: Optional[int] = None,
     ):
         self.base_url = base_url.rstrip("/")
         self.model = model
@@ -45,6 +47,8 @@ class OpenAICompatClient:
         self.timeout_s = timeout_s
         self.max_retries = max_retries
         self.backoff_s = backoff_s
+        self.extra_body = extra_body or None
+        self.max_tokens_cap = max_tokens_cap
         if api_key is None:
             api_key = os.environ.get(api_key_env, "")
         self.api_key = api_key
@@ -65,6 +69,10 @@ class OpenAICompatClient:
         }
         if seed is not None:
             body["seed"] = seed
+        if self.max_tokens_cap and max_tokens > self.max_tokens_cap:
+            body["max_tokens"] = self.max_tokens_cap
+        if self.extra_body:
+            body.update(self.extra_body)
         headers = {"Content-Type": "application/json", "User-Agent": self.user_agent}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"

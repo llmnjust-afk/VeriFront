@@ -260,6 +260,115 @@ class CodeActAgent:
         )
         return result
 
+    def run_from(self, task: TaskSpec, messages: List[Dict[str, str]],
+                 start_step: int, client_for_step=None) -> RunResult:
+        """Counterfactual continuation: resume the loop from a rebuilt message
+        history at step `start_step` (Prompt_V2 §4 deterministic replay). The
+        step budget is the remaining allowance (max_steps - start_step + 1);
+        `client_for_step(step_i)` picks the generating model per step (used by
+        the local-replacement arm). Replay consumes no step budget: the caller
+        must set start_step to the first GENERATED step of the counterfactual."""
+        traj_id = f"{task.task_id}-cf-{int(time.time())}"
+        meta = RunMeta(
+            run_id=traj_id,
+            task_id=task.task_id,
+            benchmark_version=self.benchmark_version,
+            agent_commit=self.agent_commit,
+            model_id=getattr(self.client, "model", "unknown") if self.client else "mixed",
+            model_snapshot_or_revision=getattr(self.client, "snapshot", "") or "",
+            sampling_config={
+                "temperature": self.config.temperature,
+                "seed": self.config.seed,
+                "max_tokens": self.config.max_tokens,
+                "max_steps": self.config.max_steps,
+                "step_timeout_s": self.config.step_timeout_s,
+                "cf_start_step": start_step,
+            },
+            environment_digest={"python_bin": self.config.python_bin},
+        )
+        traj = Trajectory(meta=meta)
+        totals = {"prompt": 0, "completion": 0}
+        steps: List[Dict[str, Any]] = []
+        status = "budget_exhausted"
+        final_answer: Optional[str] = None
+        start = time.monotonic()
+        ev_i = 0
+
+        for step_i in range(start_step, self.config.max_steps + 1):
+            if time.monotonic() - start > self.config.total_wall_s:
+                status = "wallclock_exceeded"
+                break
+            client = client_for_step(step_i) if client_for_step else self.client
+            resp = client.chat(
+                messages,
+                temperature=self.config.temperature,
+                max_tokens=self.config.max_tokens,
+                seed=self.config.seed,
+            )
+            u = resp["token_usage"]
+            totals["prompt"] += u.get("prompt", 0)
+            totals["completion"] += u.get("completion", 0)
+            content = resp["content"] or ""
+            kind, payload = parse_action(content)
+
+            ev_i += 1
+            traj.append(self._new_event(
+                traj_id, ev_i, "agent_message",
+                visible_agent_context=content,
+                token_usage=dict(u),
+                latency=resp.get("latency_s"),
+                extra={"parsed_action": kind, "generator": getattr(client, "model", "unknown"),
+                       "is_cf_edit_step": client_for_step is not None and step_i == start_step},
+            ))
+
+            if kind == "final":
+                final_answer = payload
+                status = "completed"
+                steps.append({"step": step_i, "kind": "final"})
+                break
+            if kind == "none":
+                observation = FORMAT_ERROR_OBSERVATION
+                exec_status = "format_error"
+            else:
+                script = self.workdir / f"step_{step_i:02d}.py"
+                script.write_text(payload, encoding="utf-8")
+                ev_i += 1
+                call_ev = self._new_event(
+                    traj_id, ev_i, "tool_call",
+                    action_id=f"act-{step_i:03d}",
+                    tool_name="python",
+                    tool_args={"script": script.name, "code_sha256": sha256_bytes(payload.encode("utf-8"))},
+                )
+                traj.append(call_ev)
+                out = self._execute(script)
+                ev_i += 1
+                traj.append(self._new_event(
+                    traj_id, ev_i, "tool_result",
+                    action_id=f"act-{step_i:03d}",
+                    tool_name="python",
+                    tool_observation=out["observation"],
+                    execution_status=out["status"],
+                ))
+                observation = out["observation"]
+                exec_status = out["status"]
+                steps.append({
+                    "step": step_i, "kind": "code", "script": script.name,
+                    "exit_code": out.get("exit_code"), "exec_status": exec_status,
+                })
+
+            messages.append({"role": "assistant", "content": content})
+            messages.append({"role": "user", "content": f"EXECUTION RESULT [{exec_status}]\n{observation}"})
+
+        result = RunResult(
+            status=status,
+            final_answer=final_answer,
+            token_usage=totals,
+            wall_s=round(time.monotonic() - start, 3),
+            steps=steps,
+            trajectory=traj,
+        )
+        return result
+
     def _execute(self, script: Path) -> Dict[str, Any]:
         mode = self._resolve_sandbox_mode()
         try:
