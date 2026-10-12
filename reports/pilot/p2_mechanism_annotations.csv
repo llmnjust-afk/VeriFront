@@ -38,6 +38,10 @@ task,edit_step,parent_stamp,arm,role,Y,status,edit_parsed,edit_generator,edit_ex
 18,1,322475,mini,neutral,1,completed,code,gpt-5.4-mini-2026-03-17,0,none,206,2,0,,,True,True,3,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 2}"
 18,1,322475,mini,neutral,1,completed,code,gpt-5.4-mini-2026-03-17,0,none,243,3,0,,,True,True,4,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 3}"
 18,1,322475,mini,neutral,1,completed,none,gpt-5.4-mini-2026-03-17,0,no_code,159,3,0,,,True,True,4,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 3}"
+18,1,322475,qwen,neutral,1,completed,code,Qwen/Qwen3-8B,1,dependency,1141,5,0,,,True,True,6,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 5}"
+18,1,322475,qwen,neutral,1,completed,code,Qwen/Qwen3-8B,1,dependency,1141,5,0,,,True,True,6,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 5}"
+18,1,322475,qwen,neutral,1,completed,code,Qwen/Qwen3-8B,1,dependency,1141,2,0,,,True,True,3,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 2}"
+18,1,322475,qwen,neutral,1,completed,code,Qwen/Qwen3-8B,1,dependency,1141,3,0,,,True,True,4,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 3}"
 18,1,322475,resample,neutral,1,completed,code,gpt-5.5-2026-04-23,0,none,383,3,0,,,True,True,4,{'gpt-5.5-2026-04-23': 4}
 18,1,322475,resample,neutral,1,completed,code,gpt-5.5-2026-04-23,0,none,418,2,0,,,True,True,3,{'gpt-5.5-2026-04-23': 3}
 18,1,322475,resample,neutral,1,completed,code,gpt-5.5-2026-04-23,0,none,460,2,0,,,True,True,3,{'gpt-5.5-2026-04-23': 3}
@@ -54,6 +58,10 @@ task,edit_step,parent_stamp,arm,role,Y,status,edit_parsed,edit_generator,edit_ex
 18,2,322475,mini,critical_success,1,completed,code,gpt-5.4-mini-2026-03-17,0,none,1188,1,0,,,False,True,2,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 1}"
 18,2,322475,mini,critical_success,1,completed,code,gpt-5.4-mini-2026-03-17,,none,1575,4,0,,,True,True,5,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 4}"
 18,2,322475,mini,critical_success,1,completed,code,gpt-5.4-mini-2026-03-17,,none,1315,2,0,,,True,True,3,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 2}"
+18,2,322475,qwen,critical_success,1,completed,code,Qwen/Qwen3-8B,1,dependency,1099,4,0,,,True,True,5,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 4}"
+18,2,322475,qwen,critical_success,1,completed,code,Qwen/Qwen3-8B,1,dependency,917,3,0,,,True,True,4,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 3}"
+18,2,322475,qwen,critical_success,1,completed,code,Qwen/Qwen3-8B,1,dependency,917,3,0,,,True,True,4,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 3}"
+18,2,322475,qwen,critical_success,1,completed,code,Qwen/Qwen3-8B,1,dependency,917,2,0,,,True,True,3,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 2}"
 18,2,322475,resample,critical_success,0,completed,code,gpt-5.5-2026-04-23,,none,2034,3,0,,,True,True,4,{'gpt-5.5-2026-04-23': 4}
 18,2,322475,resample,critical_success,1,completed,code,gpt-5.5-2026-04-23,0,none,1884,1,0,,,False,True,2,{'gpt-5.5-2026-04-23': 2}
 18,2,322475,resample,critical_success,1,completed,code,gpt-5.5-2026-04-23,0,none,1915,1,0,,,False,True,2,{'gpt-5.5-2026-04-23': 2}
@@ -72,6 +80,10 @@ task,edit_step,parent_stamp,arm,role,Y,status,edit_parsed,edit_generator,edit_ex
 18,3,322475,mini,critical_success,0,completed,code,gpt-5.4-mini-2026-03-17,,none,1212,2,0,,,True,True,3,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 2}"
 18,3,322475,mini,critical_success,1,completed,code,gpt-5.4-mini-2026-03-17,,none,1403,9,0,,,True,True,10,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 9}"
 18,3,322475,mini,critical_success,1,completed,code,gpt-5.4-mini-2026-03-17,0,none,288,3,0,,,True,True,4,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 3}"
+18,3,322475,qwen,critical_success,1,completed,code,Qwen/Qwen3-8B,1,dependency,858,2,0,,,True,True,3,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 2}"
+18,3,322475,qwen,critical_success,1,completed,code,Qwen/Qwen3-8B,1,dependency,898,2,0,,,True,True,3,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 2}"
+18,3,322475,qwen,critical_success,1,completed,code,Qwen/Qwen3-8B,1,dependency,898,2,0,,,True,True,3,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 2}"
+18,3,322475,qwen,critical_success,1,completed,code,Qwen/Qwen3-8B,1,dependency,898,2,0,,,True,True,3,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 2}"
 18,3,322475,resample,critical_success,1,completed,code,gpt-5.5-2026-04-23,0,none,2012,1,0,,,False,True,2,{'gpt-5.5-2026-04-23': 2}
 18,3,322475,resample,critical_success,0,completed,code,gpt-5.5-2026-04-23,0,none,1934,1,0,,,False,True,2,{'gpt-5.5-2026-04-23': 2}
 18,3,322475,resample,critical_success,1,completed,code,gpt-5.5-2026-04-23,0,none,2267,2,0,,,True,True,3,{'gpt-5.5-2026-04-23': 3}
@@ -98,6 +110,10 @@ task,edit_step,parent_stamp,arm,role,Y,status,edit_parsed,edit_generator,edit_ex
 35,1,319454,mini,critical_failure,1,completed,code,gpt-5.4-mini-2026-03-17,0,none,154,6,0,,,True,True,7,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 6}"
 35,1,319454,mini,critical_failure,0,completed,code,gpt-5.4-mini-2026-03-17,0,none,334,4,0,,,True,True,5,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 4}"
 35,1,319454,mini,critical_failure,1,completed,code,gpt-5.4-mini-2026-03-17,0,none,314,4,0,,,True,True,5,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 4}"
+35,1,319454,qwen,critical_failure,1,completed,code,Qwen/Qwen3-8B,1,name_attr,210,4,0,,,True,True,5,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 4}"
+35,1,319454,qwen,critical_failure,1,completed,code,Qwen/Qwen3-8B,1,name_attr,210,4,0,,,True,True,5,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 4}"
+35,1,319454,qwen,critical_failure,0,completed,code,Qwen/Qwen3-8B,1,name_attr,210,2,0,,,True,True,3,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 2}"
+35,1,319454,qwen,critical_failure,1,completed,code,Qwen/Qwen3-8B,1,name_attr,210,4,0,,,True,True,5,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 4}"
 35,1,319454,resample,critical_failure,0,completed,code,gpt-5.5-2026-04-23,0,none,6958,1,0,,,False,True,2,{'gpt-5.5-2026-04-23': 2}
 35,1,319454,resample,critical_failure,1,completed,code,gpt-5.5-2026-04-23,0,none,460,4,0,,,True,True,5,{'gpt-5.5-2026-04-23': 5}
 35,1,319454,resample,critical_failure,0,completed,code,gpt-5.5-2026-04-23,0,none,5666,1,0,,,False,True,2,{'gpt-5.5-2026-04-23': 2}
@@ -124,6 +140,12 @@ task,edit_step,parent_stamp,arm,role,Y,status,edit_parsed,edit_generator,edit_ex
 37,10,319742,ds,critical_success,1,completed,code,deepseek-v3.2,0,none,592,1,0,,,False,True,2,"{'deepseek-v3.2': 1, 'gpt-5.5-2026-04-23': 1}"
 37,10,319742,mini,critical_success,1,completed,code,gpt-5.4-mini-2026-03-17,0,none,464,1,0,,,False,True,2,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 1}"
 37,10,319742,mini,critical_success,1,completed,code,gpt-5.4-mini-2026-03-17,0,none,580,1,0,,,False,True,2,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 1}"
+37,10,319742,mini,critical_success,1,completed,code,gpt-5.4-mini-2026-03-17,0,none,589,1,0,,,False,True,2,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 1}"
+37,10,319742,mini,critical_success,1,completed,code,gpt-5.4-mini-2026-03-17,0,none,589,1,0,,,False,True,2,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 1}"
+37,10,319742,qwen,critical_success,1,completed,code,Qwen/Qwen3-8B,0,none,599,1,0,,,False,True,2,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 1}"
+37,10,319742,qwen,critical_success,1,completed,code,Qwen/Qwen3-8B,0,none,599,1,0,,,False,True,2,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 1}"
+37,10,319742,qwen,critical_success,1,completed,code,Qwen/Qwen3-8B,0,none,599,1,0,,,False,True,2,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 1}"
+37,10,319742,qwen,critical_success,1,completed,code,Qwen/Qwen3-8B,0,none,599,1,0,,,False,True,2,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 1}"
 37,10,319742,resample,critical_success,1,completed,code,gpt-5.5-2026-04-23,0,none,621,1,0,,,False,True,2,{'gpt-5.5-2026-04-23': 2}
 37,10,319742,resample,critical_success,1,completed,code,gpt-5.5-2026-04-23,0,none,662,1,0,,,False,True,2,{'gpt-5.5-2026-04-23': 2}
 37,10,319742,resample,critical_success,1,completed,code,gpt-5.5-2026-04-23,0,none,655,1,0,,,False,True,2,{'gpt-5.5-2026-04-23': 2}
@@ -203,6 +225,10 @@ task,edit_step,parent_stamp,arm,role,Y,status,edit_parsed,edit_generator,edit_ex
 44,4,299358,mini,critical_failure,0,completed,code,gpt-5.4-mini-2026-03-17,1,other_error,484,2,1,2,other_error,True,True,3,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 2}"
 44,4,299358,mini,critical_failure,0,completed,code,gpt-5.4-mini-2026-03-17,1,other_error,516,2,0,,,True,True,3,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 2}"
 44,4,299358,mini,critical_failure,0,completed,code,gpt-5.4-mini-2026-03-17,1,other_error,436,2,0,,,True,True,3,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 2}"
+44,4,299358,qwen,critical_failure,0,completed,code,Qwen/Qwen3-8B,1,other_error,268,5,2,2,other_error;other_error,True,True,6,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 5}"
+44,4,299358,qwen,critical_failure,1,completed,code,Qwen/Qwen3-8B,1,other_error,276,4,0,,,True,True,5,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 4}"
+44,4,299358,qwen,critical_failure,0,completed,code,Qwen/Qwen3-8B,1,other_error,276,6,1,3,other_error,True,True,7,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 6}"
+44,4,299358,qwen,critical_failure,0,completed,code,Qwen/Qwen3-8B,1,other_error,276,7,2,3,dependency;other_error,True,True,8,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 7}"
 44,4,299358,resample,critical_failure,1,completed,code,gpt-5.5-2026-04-23,0,none,677,2,0,,,True,True,3,{'gpt-5.5-2026-04-23': 3}
 44,4,299358,resample,critical_failure,0,completed,code,gpt-5.5-2026-04-23,0,none,821,1,0,,,False,True,2,{'gpt-5.5-2026-04-23': 2}
 44,4,299358,resample,critical_failure,0,completed,code,gpt-5.5-2026-04-23,1,other_error,812,2,0,,,True,True,3,{'gpt-5.5-2026-04-23': 3}
@@ -236,6 +262,10 @@ task,edit_step,parent_stamp,arm,role,Y,status,edit_parsed,edit_generator,edit_ex
 45,1,319021,ds,critical_success,1,completed,code,deepseek-v3.2,0,none,217,2,0,,,True,True,3,"{'deepseek-v3.2': 1, 'gpt-5.5-2026-04-23': 2}"
 45,1,319021,mini,critical_success,1,completed,code,gpt-5.4-mini-2026-03-17,0,none,78,3,0,,,True,True,4,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 3}"
 45,1,319021,mini,critical_success,1,completed,code,gpt-5.4-mini-2026-03-17,0,none,159,2,0,,,True,True,3,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 2}"
+45,1,319021,qwen,critical_success,1,completed,code,Qwen/Qwen3-8B,0,none,78,4,0,,,True,True,5,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 4}"
+45,1,319021,qwen,critical_success,1,completed,code,Qwen/Qwen3-8B,0,none,78,6,0,,,True,True,7,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 6}"
+45,1,319021,qwen,critical_success,1,completed,code,Qwen/Qwen3-8B,0,none,78,4,0,,,True,True,5,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 4}"
+45,1,319021,qwen,critical_success,1,completed,code,Qwen/Qwen3-8B,0,none,78,7,1,4,dependency,True,True,8,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 7}"
 45,1,319021,resample,critical_success,1,completed,code,gpt-5.5-2026-04-23,1,data_state,907,3,0,,,True,True,4,{'gpt-5.5-2026-04-23': 4}
 45,1,319021,resample,critical_success,1,completed,code,gpt-5.5-2026-04-23,1,name_attr,885,2,0,,,True,True,3,{'gpt-5.5-2026-04-23': 3}
 45,1,319021,resample,critical_success,1,completed,code,gpt-5.5-2026-04-23,1,name_attr,922,3,0,,,True,True,4,{'gpt-5.5-2026-04-23': 4}
@@ -254,6 +284,10 @@ task,edit_step,parent_stamp,arm,role,Y,status,edit_parsed,edit_generator,edit_ex
 58,2,278797,mini,neutral,0,completed,code,gpt-5.4-mini-2026-03-17,0,none,226,1,0,,,False,True,2,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 1}"
 58,2,278797,mini,neutral,1,completed,code,gpt-5.4-mini-2026-03-17,0,none,416,2,0,,,True,True,3,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 2}"
 58,2,278797,mini,neutral,1,completed,code,gpt-5.4-mini-2026-03-17,0,none,308,2,0,,,True,True,3,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 2}"
+58,2,278797,qwen,neutral,1,completed,code,Qwen/Qwen3-8B,1,name_attr,575,3,0,,,True,True,4,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 3}"
+58,2,278797,qwen,neutral,1,completed,code,Qwen/Qwen3-8B,1,name_attr,581,3,0,,,True,True,4,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 3}"
+58,2,278797,qwen,neutral,1,completed,code,Qwen/Qwen3-8B,1,name_attr,581,3,0,,,True,True,4,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 3}"
+58,2,278797,qwen,neutral,1,completed,code,Qwen/Qwen3-8B,1,name_attr,581,3,0,,,True,True,4,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 3}"
 58,2,278797,resample,neutral,1,completed,code,gpt-5.5-2026-04-23,1,other_error,547,2,0,,,True,True,3,{'gpt-5.5-2026-04-23': 3}
 58,2,278797,resample,neutral,1,completed,code,gpt-5.5-2026-04-23,0,none,582,2,0,,,True,True,3,{'gpt-5.5-2026-04-23': 3}
 58,2,278797,resample,neutral,1,completed,code,gpt-5.5-2026-04-23,0,none,463,2,0,,,True,True,3,{'gpt-5.5-2026-04-23': 3}
@@ -350,6 +384,10 @@ task,edit_step,parent_stamp,arm,role,Y,status,edit_parsed,edit_generator,edit_ex
 60,8,321913,mini,critical_success,1,completed,code,gpt-5.4-mini-2026-03-17,0,none,1350,2,0,,,True,True,3,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 2}"
 60,8,321913,mini,critical_success,0,completed,code,gpt-5.4-mini-2026-03-17,1,data_state,1837,2,0,,,True,True,3,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 2}"
 60,8,321913,mini,critical_success,0,completed,code,gpt-5.4-mini-2026-03-17,0,none,282,2,0,,,True,True,3,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 2}"
+60,8,321913,qwen,critical_success,1,completed,code,Qwen/Qwen3-8B,1,data_state,425,2,0,,,True,True,3,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 2}"
+60,8,321913,qwen,critical_success,1,completed,code,Qwen/Qwen3-8B,1,other_error,490,2,0,,,True,True,3,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 2}"
+60,8,321913,qwen,critical_success,1,completed,code,Qwen/Qwen3-8B,1,other_error,490,2,0,,,True,True,3,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 2}"
+60,8,321913,qwen,critical_success,1,completed,code,Qwen/Qwen3-8B,1,other_error,490,2,0,,,True,True,3,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 2}"
 60,8,321913,resample,critical_success,1,completed,code,gpt-5.5-2026-04-23,0,none,2736,2,0,,,True,True,3,{'gpt-5.5-2026-04-23': 3}
 60,8,321913,resample,critical_success,1,completed,code,gpt-5.5-2026-04-23,0,none,2652,1,0,,,False,True,2,{'gpt-5.5-2026-04-23': 2}
 60,8,321913,resample,critical_success,0,completed,code,gpt-5.5-2026-04-23,0,none,2817,1,0,,,False,True,2,{'gpt-5.5-2026-04-23': 2}
@@ -384,6 +422,10 @@ task,edit_step,parent_stamp,arm,role,Y,status,edit_parsed,edit_generator,edit_ex
 85,1,318581,mini,neutral,1,completed,code,gpt-5.4-mini-2026-03-17,0,none,436,1,0,,,False,True,2,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 1}"
 85,1,318581,mini,neutral,0,completed,code,gpt-5.4-mini-2026-03-17,0,none,317,4,1,3,other_error,True,True,5,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 4}"
 85,1,318581,mini,neutral,1,completed,code,gpt-5.4-mini-2026-03-17,0,none,666,2,0,,,True,True,3,"{'gpt-5.4-mini-2026-03-17': 1, 'gpt-5.5-2026-04-23': 2}"
+85,1,318581,qwen,neutral,0,completed,code,Qwen/Qwen3-8B,1,other_error,260,2,0,,,True,True,3,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 2}"
+85,1,318581,qwen,neutral,1,completed,code,Qwen/Qwen3-8B,1,other_error,260,2,0,,,True,True,3,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 2}"
+85,1,318581,qwen,neutral,0,completed,code,Qwen/Qwen3-8B,1,other_error,260,3,0,,,True,True,4,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 3}"
+85,1,318581,qwen,neutral,1,completed,code,Qwen/Qwen3-8B,1,other_error,260,2,0,,,True,True,3,"{'Qwen/Qwen3-8B': 1, 'gpt-5.5-2026-04-23': 2}"
 85,1,318581,resample,neutral,0,completed,code,gpt-5.5-2026-04-23,0,none,757,2,0,,,True,True,3,{'gpt-5.5-2026-04-23': 3}
 85,1,318581,resample,neutral,1,completed,code,gpt-5.5-2026-04-23,0,none,727,1,0,,,False,True,2,{'gpt-5.5-2026-04-23': 2}
 85,1,318581,resample,neutral,1,completed,code,gpt-5.5-2026-04-23,0,none,627,2,0,,,True,True,3,{'gpt-5.5-2026-04-23': 3}

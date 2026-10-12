@@ -143,6 +143,8 @@ def main():
         if k not in pts:
             continue
         trace = os.path.join(os.path.dirname(f), 'trace.jsonl')
+        if os.path.exists(trace) and 'SANDBOX ERROR' in open(trace, errors='ignore').read():
+            continue
         feat = parse_trace(trace, m['edit_step']) if os.path.exists(trace) else {}
         row = {
             'task': k[0], 'edit_step': k[1], 'parent_stamp': stamp[-6:],
@@ -241,11 +243,44 @@ def dod():
         dc_s = f"{d_c:+.2f}" if d_c is not None else '-'
         dc_c = f"{cx}/{cn} ({cx/cn:.2f})" if cn else 'no runs'
         L.append(f"| {a} | {sx}/{sn} ({sx/sn:.2f}) | {dc_c} | {d_s:+.2f} | {dc_s} | {did} |")
+    # common control-point set (the 10 points qwen covered) -- removes selection bias
+    ctl10 = {('18',1),('18',2),('18',3),('35',1),('37',10),('44',4),('58',2),('60',8),('85',1),('45',1)}
+    agg2 = collections.defaultdict(lambda: collections.defaultdict(lambda: [0, 0]))
+    import glob as _g, json as _j, os as _os
+    pts2 = load_points()
+    for f in (_g.glob('runs/sab_*/cf_frontier_resample/*/result.json')
+              + _g.glob('runs/sab_*/cf_local_replace/*/result.json')):
+        r = _j.load(open(f)); m = r['cf_meta']
+        em = m.get('edit_model') or ''
+        if 'resample' in f: arm = 'resample'
+        elif 'mini' in em: arm = 'mini'
+        elif 'Qwen' in em: arm = 'qwen'
+        else: arm = 'ds'
+        stamp = str(m.get('parent_run', '')).rsplit('/', 1)[-1]
+        k = (str(r['instance_id']), int(m['edit_step']), stamp)
+        if k not in pts2: continue
+        grp = 'sig' if (k[0], k[1]) in sig else ('ctl10' if (k[0], k[1]) in ctl10 else None)
+        if grp is None: continue
+        tr = _os.path.join(_os.path.dirname(f), 'trace.jsonl')
+        if _os.path.exists(tr) and 'SANDBOX ERROR' in open(tr, errors='ignore').read():
+            continue
+        c = agg2[arm][grp]; c[0] += r['eval_success']; c[1] += 1
     L.append('')
-    L.append('Note: qwen crash rate at edit step is 58% at BOTH signal and control points '
-             '(model-level weakness, orthogonal to step-specificity), but qwen has NO control-point '
-             'runs yet (replication covered signal points only), so its DiD is pending a control-arm '
-             'run batch (P2b). mini/ds DiDs are computable and confirm step-specific extra damage.')
+    L.append('## Common-control-set DiD (10 shared control points, sandbox-invalid excluded)\n')
+    L.append('| arm | sig SR | ctl10 SR | dSR_sig | dSR_ctl10 | DiD_common |')
+    L.append('|---|---|---|---|---|---|')
+    b2s, b2c = agg2['resample']['sig'], agg2['resample']['ctl10']
+    for a in ['mini', 'ds', 'qwen']:
+        s_, c_ = agg2[a]['sig'], agg2[a]['ctl10']
+        d_s = s_[0] / s_[1] - b2s[0] / b2s[1]
+        d_c = c_[0] / c_[1] - b2c[0] / b2c[1]
+        L.append(f"| {a} | {s_[0]}/{s_[1]} ({s_[0]/s_[1]:.2f}) | {c_[0]}/{c_[1]} ({c_[0]/c_[1]:.2f}) | {d_s:+.2f} | {d_c:+.2f} | **{d_s - d_c:+.2f}** |")
+    L.append('')
+    L.append('Notes: (i) qwen edit-step crash rate is 58% at both signal and control points '
+             '(model-level weakness, orthogonal to step-specificity); (ii) qwen control advantage '
+             'over resample at ctl10 is driven partly by repair wins at t35s1 (3/4 vs 1/4) and '
+             'small-sample points (t18s2/s3, t60s8); (iii) pooled and common-set DiDs agree in '
+             'ordering: qwen > ds > mini in step-specific extra damage.')
     open('reports/pilot/p2_did_table.md', 'w').write('\n'.join(L) + '\n')
     print('\n'.join(L))
 

@@ -5,12 +5,12 @@
 | error_type | ds | mini | qwen | resample |
 |---|---|---|---|---|
 | assert | 0 | 1 | 0 | 0 |
-| data_state | 1 | 1 | 0 | 2 |
-| dependency | 1 | 0 | 0 | 3 |
-| name_attr | 3 | 3 | 5 | 2 |
+| data_state | 1 | 1 | 1 | 2 |
+| dependency | 1 | 0 | 12 | 3 |
+| name_attr | 3 | 3 | 13 | 2 |
 | no_code | 19 | 10 | 0 | 0 |
-| none | 105 | 107 | 22 | 128 |
-| other_error | 4 | 11 | 25 | 2 |
+| none | 105 | 109 | 30 | 128 |
+| other_error | 4 | 11 | 36 | 2 |
 
 ## Signal points only: edit-step error type x arm
 
