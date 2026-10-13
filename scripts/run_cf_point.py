@@ -66,6 +66,14 @@ def main() -> int:
     ap.add_argument("--edit-timeout-s", type=float, default=120.0)
     ap.add_argument("--edit-max-tokens", type=int, default=None,
                     help="cap max_tokens for the edit model (e.g. 4096 for 32K local ctx)")
+    ap.add_argument("--feedback-mode", choices=["none", "original_retry", "structured"],
+                    default="none",
+                    help="none: P1 protocol (no retry). original_retry: one retry on "
+                         "takeover-step failure with a bare 'please fix' message. "
+                         "structured: one retry with stderr tail + validator report.")
+    ap.add_argument("--validator", default="",
+                    help="verifront.eval module name for structured feedback, "
+                         "e.g. validators_sab40")
     ap.add_argument("--python-bin", default=PYTHON_BIN_DEFAULT)
     ap.add_argument("--workdir-root", default="/tmp/vf_work")
     ap.add_argument("--artifacts-root", default=str(ROOT / "runs"))
@@ -136,8 +144,43 @@ def main() -> int:
             return edit_client
         return frontier_client
 
+    validator_last_report = [None]
+
+    def feedback_hook(step_i: int, exec_status: str, observation: str, workdir: str):
+        if args.feedback_mode == "none":
+            return None
+        rep = None
+        if args.validator:
+            import importlib
+            try:
+                vmod = importlib.import_module(f"verifront.eval.{args.validator}")
+                rep = vmod.run_report(workdir)
+                validator_last_report[0] = rep
+            except Exception as e:  # validator must never crash a run
+                rep = {"ok": True, "issues": [f"validator_error: {e}"]}
+                validator_last_report[0] = rep
+        if exec_status == "ok":
+            return None
+        if args.feedback_mode == "original_retry":
+            return ("The previous step's execution did not run cleanly "
+                    "(non-zero exit or timeout). Please review the situation and "
+                    "produce a corrected, more robust action for this same step.")
+        parts = ["VALIDATION FEEDBACK for the previous step "
+                 "(machine-checkable diagnostics; no reference answers exist in this environment):"]
+        if exec_status != "ok":
+            parts.append("Execution observation (tail):\n" + observation[-1200:])
+        if rep is not None:
+            parts.append("Artifact validator report (JSON):\n"
+                         + json.dumps(rep, ensure_ascii=False)[:1500])
+        parts.append("Fix the issues above and re-issue the action for this same step.")
+        return "\n\n".join(parts)
+
+    feedback_hook = feedback_hook if args.feedback_mode != "none" else None
     run = agent.run_from(spec, messages, start_step=args.at_step,
-                         client_for_step=client_for_step)
+                         client_for_step=client_for_step,
+                         feedback_hook=feedback_hook)
+    retry_used = any(s.get("feedback_retry") or s.get("retry")
+                     for s in run.steps)
 
     for p in sorted(paths.workdir.glob("step_*.py")):
         shutil.copy2(p, out_dir / p.name)
@@ -155,6 +198,9 @@ def main() -> int:
         "instance_id": instance_id, "arm": f"cf_{args.arm}",
         "edit_step": args.at_step, "edit_model": args.edit_model,
         "edit_model_snapshot": args.edit_model_snapshot,
+        "feedback_mode": args.feedback_mode,
+        "retry_used": retry_used,
+        "validator_report": validator_last_report[0],
         "parent_run": str(parent), "parent_outcome": parent_result["eval_success"],
         "replay_fidelity": fidelity, "cf_status": run.status, "cf_steps": run.steps,
         "edit_step_parsed_action": edit_parsed,

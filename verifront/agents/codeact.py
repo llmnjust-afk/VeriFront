@@ -261,13 +261,18 @@ class CodeActAgent:
         return result
 
     def run_from(self, task: TaskSpec, messages: List[Dict[str, str]],
-                 start_step: int, client_for_step=None) -> RunResult:
+                 start_step: int, client_for_step=None, feedback_hook=None) -> RunResult:
         """Counterfactual continuation: resume the loop from a rebuilt message
         history at step `start_step` (Prompt_V2 §4 deterministic replay). The
         step budget is the remaining allowance (max_steps - start_step + 1);
         `client_for_step(step_i)` picks the generating model per step (used by
         the local-replacement arm). Replay consumes no step budget: the caller
-        must set start_step to the first GENERATED step of the counterfactual."""
+        must set start_step to the first GENERATED step of the counterfactual.
+
+        `feedback_hook(step_i, exec_status, observation, workdir)` may return a
+        retry feedback message after the takeover step's execution; the SAME
+        client regenerates the step once. The hook fires at most once, only on
+        the takeover step, and only when its execution status is not "ok"."""
         traj_id = f"{task.task_id}-cf-{int(time.time())}"
         meta = RunMeta(
             run_id=traj_id,
@@ -358,6 +363,70 @@ class CodeActAgent:
 
             messages.append({"role": "assistant", "content": content})
             messages.append({"role": "user", "content": f"EXECUTION RESULT [{exec_status}]\n{observation}"})
+
+            retry_msg = None
+            if (feedback_hook is not None and step_i == start_step
+                    and exec_status != "ok"):
+                retry_msg = feedback_hook(step_i, exec_status, observation, str(self.workdir))
+            if retry_msg is not None:
+                if steps and steps[-1].get("step") == step_i:
+                    steps[-1]["feedback_retry"] = True
+                messages.append({"role": "user", "content": retry_msg})
+                resp = client.chat(
+                    messages,
+                    temperature=self.config.temperature,
+                    max_tokens=self.config.max_tokens,
+                    seed=self.config.seed,
+                )
+                u = resp["token_usage"]
+                totals["prompt"] += u.get("prompt", 0)
+                totals["completion"] += u.get("completion", 0)
+                content = resp["content"] or ""
+                kind, payload = parse_action(content)
+                ev_i += 1
+                traj.append(self._new_event(
+                    traj_id, ev_i, "agent_message",
+                    visible_agent_context=content,
+                    token_usage=dict(u),
+                    latency=resp.get("latency_s"),
+                    extra={"parsed_action": kind, "generator": getattr(client, "model", "unknown"),
+                           "is_cf_edit_step": step_i == start_step, "is_feedback_retry": True},
+                ))
+                if kind == "final":
+                    final_answer = payload
+                    status = "completed"
+                    steps.append({"step": step_i, "kind": "final", "retry": True})
+                    break
+                if kind == "code":
+                    script = self.workdir / f"step_{step_i:02d}r.py"
+                    script.write_text(payload, encoding="utf-8")
+                    ev_i += 1
+                    traj.append(self._new_event(
+                        traj_id, ev_i, "tool_call",
+                        action_id=f"act-{step_i:03d}r",
+                        tool_name="python",
+                        tool_args={"script": script.name, "code_sha256": sha256_bytes(payload.encode("utf-8")),
+                                   "feedback_retry": True},
+                    ))
+                    out = self._execute(script)
+                    ev_i += 1
+                    traj.append(self._new_event(
+                        traj_id, ev_i, "tool_result",
+                        action_id=f"act-{step_i:03d}r",
+                        tool_name="python",
+                        tool_observation=out["observation"],
+                        execution_status=out["status"],
+                    ))
+                    observation = out["observation"]
+                    exec_status = out["status"]
+                    steps.append({
+                        "step": step_i, "kind": "code", "script": script.name,
+                        "exit_code": out.get("exit_code"), "exec_status": exec_status,
+                        "retry": True,
+                    })
+                    messages.append({"role": "assistant", "content": content})
+                    messages.append({"role": "user", "content": f"EXECUTION RESULT [{exec_status}]\n{observation}"})
+                # kind == "none": no further retry (single-shot window)
 
         result = RunResult(
             status=status,
