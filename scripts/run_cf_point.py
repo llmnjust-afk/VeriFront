@@ -74,6 +74,12 @@ def main() -> int:
     ap.add_argument("--validator", default="",
                     help="verifront.eval module name for structured feedback, "
                          "e.g. validators_sab40")
+    ap.add_argument("--trigger", choices=["exit_code", "exit_or_validator"],
+                    default="exit_code",
+                    help="when the single-shot retry fires: on non-ok execution "
+                         "only (v1) or additionally when the validator report "
+                         "fails (v2; semantic-failure trigger). Identical for "
+                         "both arms, so fairness holds.")
     ap.add_argument("--python-bin", default=PYTHON_BIN_DEFAULT)
     ap.add_argument("--workdir-root", default="/tmp/vf_work")
     ap.add_argument("--artifacts-root", default=str(ROOT / "runs"))
@@ -154,17 +160,23 @@ def main() -> int:
             import importlib
             try:
                 vmod = importlib.import_module(f"verifront.eval.{args.validator}")
-                rep = vmod.run_report(workdir)
+                rep = vmod.run_report(workdir, step_no=step_i)
                 validator_last_report[0] = rep
             except Exception as e:  # validator must never crash a run
                 rep = {"ok": True, "issues": [f"validator_error: {e}"]}
                 validator_last_report[0] = rep
-        if exec_status == "ok":
-            return None
+        if args.trigger == "exit_code":
+            if exec_status == "ok":
+                return None
+        else:  # exit_or_validator (v2)
+            if exec_status == "ok" and (rep is None or rep.get("ok", True)):
+                return None
         if args.feedback_mode == "original_retry":
             return ("The previous step's execution did not run cleanly "
-                    "(non-zero exit or timeout). Please review the situation and "
-                    "produce a corrected, more robust action for this same step.")
+                    "(non-zero exit/timeout, or its produced artifacts failed "
+                    "the machine-checkable sanity validation). Please review "
+                    "the situation and produce a corrected, more robust action "
+                    "for this same step.")
         parts = ["VALIDATION FEEDBACK for the previous step "
                  "(machine-checkable diagnostics; no reference answers exist in this environment):"]
         if exec_status != "ok":
@@ -199,6 +211,7 @@ def main() -> int:
         "edit_step": args.at_step, "edit_model": args.edit_model,
         "edit_model_snapshot": args.edit_model_snapshot,
         "feedback_mode": args.feedback_mode,
+        "trigger": args.trigger,
         "retry_used": retry_used,
         "validator_report": validator_last_report[0],
         "parent_run": str(parent), "parent_outcome": parent_result["eval_success"],
