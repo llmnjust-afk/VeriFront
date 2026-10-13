@@ -57,6 +57,15 @@
 - **能力依赖集中在平台区**：t60s4–8、t40s4 上 mini/ds/qwen 相对 resample 的损失清晰可见，且逐臂不同；
 - **修复面反例三重扩展**：t35s1 修复率 resample 1/4、mini 2/4、ds 4/4、**qwen 3/4**——所有非前沿臂都能修复，总修复率高于 frontier 重采样本身；10 个 crit/fail 点中 frontier 仅 2 点修复成功 → **换模型的错误多样性至少与重采样同等有效**。
 
+### 2.5 全步扫描统计检验（`p2_scan_stats.md`，分层 CMH 池化）
+
+- **单步功效现实**：42 个步内臂间 Fisher 检验经 BH-FDR 校正后 **0 个 q<0.10**（每格 n=2–9，SR 取值粒度 1/2）——单步剖面只能描述、不可推断；这本身是 §5.1 报告的诚实结论；
+- **分层分解（T2/T4）**：步被 resample 基线健康度分为"任务结构性悬崖"（t60s1–2，resample 0/8）与"能力依赖平台"（其余 12 步，resample 均 ≥0.5）；
+  - 悬崖步池化 ΔSR：**ds +0.62、mini +0.25、qwen 0.00**——deepseek 用不同先验**修复了前沿重采样自身失败的状态**（结构性悬崖 ≠ 绝对不可恢复，是"父轨迹状态 × 前沿采样"的联合坍缩）；
+  - 平台步 CMH 池化检验（12 步分层）：**mini OR=0.26，p=0.0073（显著）**、qwen OR=0.52（p=0.22）、ds OR=0.87（p=0.76）——**能力依赖损伤由 mini 显著驱动**，ds 在平台区与基线打平；
+- **复现性（T3）**：P1 信号点在扫描中的 mini ΔSR 符号全部复现（t40s4：−0.50 vs −0.50 完全一致；t60s4：−0.38 vs −0.18 同号）；
+- **对 §5.5 的指向**：反馈干预的目标步应选平台区 mini 显著失效步（t40s4、t60s4）——能力依赖 + 校验器可得，机制假设直接可检验。
+
 ---
 
 ## 三、方法学修正（P2-0 审计产出，均已回写主报告）
@@ -92,4 +101,4 @@
 | 环境恢复期损毁/重跑 | ~8 | ≈5 CA |
 | **项目累计** | **≈599** | **≈650 CA（≈ $91）** |
 
-*图表索引：`figures/p2_fig_signal_points.png`（四臂对比）、`p2_fig_did.png`（DiD）、`p2_fig_tiers.png`（三层失效）、`p2_scan_profile.png`（全步剖面）。全部数字可由 `scripts/p2_reproduce_tables.py` 与 `p2_mechanism_features.py dod` 一键复现。*
+*图表索引：`figures/p2_fig_signal_points.png`（四臂对比）、`p2_fig_did.png`（DiD）、`p2_fig_tiers.png`（三层失效）、`p2_scan_profile.png`（全步剖面）。全部数字可由 `scripts/p2_reproduce_tables.py`、`p2_mechanism_features.py dod`、`p2_scan_stats.py` 一键复现。统计口径：单步臂间用 Fisher 精确检验 + BH-FDR；池化用分层 CMH（Mantel-Haenszel，12 能力依赖步为层）；区间为 Wilson 95% CI。*
