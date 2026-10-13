@@ -138,7 +138,7 @@ def main():
         L.append(s)
 
     # ---- inventory CSV ----
-    cols = ['task','edit_step','parent_stamp','arm','edit_model','Y','status','cf_status',
+    cols = ['task','edit_step','parent_stamp','arm','edit_model','Y','status','cf_status','sandbox_invalid',
             'edit_parsed','n_replayed','all_status_match','n_obs_identical','prompt_tokens',
             'completion_tokens','wall_s','stamp','parent_run','parent_outcome','in_points',
             'role','point_key','rep','n_rep_total']
