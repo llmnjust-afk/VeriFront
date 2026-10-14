@@ -1,0 +1,8 @@
+point_id,F1,F2,F3,F4,F5,F6,F7,rationale
+t40s1@1791613483-305791,0,0,1,1,0,1,code_script,print shape/cols/dtypes/head: no ground truth to compare -> F1=0; no artifact -> F2=0; file errors would raise (generic feedback); only reads task input files, no prior-step refs
+t40s3@1791613483-305791,1,2,2,1,0,1,code_script,full RF training writes pred_results deliverables -> F2=2; split_defs inferred from benchmark naming (in-step decision, no prior-step refs); OBS shows TIMEOUT with empty stdout: explicit failure signal but no locus info -> F3=2 F4=1
+t60s1@1791614180-321913,0,0,1,1,0,1,code_script,pure filesystem/data inspection printing schemas; nothing to be right or wrong; only task inputs read
+t60s3@1791614180-321913,1,1,2,2,0,1,code_script,consistency audit of bundled accuracy table: counts quantifiable but depend on expected-combo interpretation -> F1=1 F2=1; missing model-rule-task combos printed directly -> task-specific feedback -> F3=2 F4=2
+t60s5@1791614180-321913,1,1,2,2,0,1,code_script,MFA derivation: correctness quantifiable but tie-handling and figure-convention mapping are in-step judgment calls -> F1=1; mismatch table against bundled truth printed directly -> F3=2 F4=2; reads task inputs only -> F5=0
+t60s6@1791614180-321913,0,0,1,1,0,1,code_script,AST+full-source printout of rule files: inspection step, no artifact, nothing right-or-wrong
+t60s7@1791614180-321913,0,0,1,1,0,1,code_script,reads and prints three rule source files: pure inspection

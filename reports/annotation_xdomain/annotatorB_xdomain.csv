@@ -1,0 +1,8 @@
+point_id,F1,F2,F3,F4,F5,F6,F7,rationale
+t40s1@1791613483-305791,0,0,1,1,1,1,code_script,exploration printout has no correctness standard and produces no artifact; the paths dict encodes assumptions about the working-directory layout, treating it as mild state dependence
+t40s3@1791613483-305791,1,2,1,1,1,1,code_script,writes required deliverables (F2=2); TIMEOUT with empty stdout gives only a pass/fail-like signal and no diagnostic content (F3=1); split definitions rely on benchmark naming conventions carried in context (F5=1)
+t60s1@1791614180-321913,0,0,1,1,0,1,code_script,inspection of dataset layout; no artifacts, no prior-step references
+t60s3@1791614180-321913,1,1,1,2,0,1,code_script,printed counts and missing-combination checks are verifiable intermediates; feedback requires reading the printout and comparing to expectations rather than an explicit error signal (F3=1), but the missing-combo list pinpoints what to fix (F4=2)
+t60s5@1791614180-321913,2,1,2,2,1,1,code_script,MFA is the benchmark-specified rule and per-syllogism counts are deterministic (F1=2); the canonical mapping relies on conventions of the bundled model files (F5=1); mismatch table is direct feedback
+t60s6@1791614180-321913,0,0,1,1,0,1,code_script,source inspection of rule implementations; no artifacts
+t60s7@1791614180-321913,0,0,1,1,0,1,code_script,source inspection of three rule files; no artifacts
