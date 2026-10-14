@@ -57,8 +57,8 @@ clarification); those points are excluded from F2 pairwise kappa.
   - t85s1@1791613931-318581: A=1 B=2 | A-rat: saliva数据结构探查打印MultiIndex/shape/head，无产物 | B-rat: 这里查看唾液数据的索引层级和皮质醇列，输出显示154条记录及两种实验条件，属于输入检查，还没有计算完整统计结果
 
 ## F4 (weighted kappa, quadratic)
-- kappa = +0.052 (n=38, raw agreement 0.342) LOW (<0.6 -> clarify & re-annotate)
-- A dist: {'1': 36, '2': 2} | B dist: {'0': 1, '1': 11, '2': 26}
+- kappa = +0.163 (n=38, raw agreement 0.368) LOW (<0.6 -> clarify & re-annotate)
+- A dist: {'0': 1, '1': 35, '2': 2} | B dist: {'0': 1, '1': 11, '2': 26}
 - blanks excluded: 0
 - disagreements:
   - t18s1@1791613049-280338: A=1 B=2 | A-rat: RF训练并写pred_results CSV+summary JSON；log打印逐split训练/CV进展；预测正确性 | B-rat: 用三种数据划分训练随机森林并保存预测文件，日志列出了交叉验证得分和样本数量，还能看出部分标签与分组不一致，可直接检查数据
@@ -69,7 +69,6 @@ clarification); those points are excluded from F2 pairwise kappa.
   - t35s1@1791613992-319454: A=1 B=2 | A-rat: RRV完整版计算写产物；打印逐被试特征值；eval现成 | B-rat: 这里采用自适应参数识别呼吸峰，日志里有44个吸气峰和41个有效间隔，也保存了68列特征，检查结果时有具体数值可对照
   - t37s10@1791614063-319742: A=1 B=2 | A-rat: CFT计算写JSON产物；打印逐文件onset/参数；eval现成；依赖前序源码理解 | B-rat: 读取MIST3心率表后调用CFT计算指标，日志给出了基线心率和起始心率的具体值，三个结果也写入了文件，方便核对
   - t40s2@1791613483-305791: A=1 B=2 | A-rat: MD数据结构探查打印shape/列/dtype，无产物 | B-rat: 这一步核对分子描述符与标签表的样本数量，输出列出了训练集和测试集的行列数，代码还检查缺失值和无穷值，问题比较容易定位
-  - t40s2@1791614542-345089: A=1 B=0 | A-rat: 建模步写产物eval现成；但观察仅显示TIMEOUT无任何stdout/指标，反馈退化为通用超时信号故F3=1 | B-rat: 原本要用随机搜索训练随机森林，但运行300秒后超时，输出里没有训练指标或保存记录，暂时无法确认最终文件是否写出
   - t40s4@1791613483-305791: A=1 B=2 | A-rat: grid_search训练RF写MD_*_RF.csv+summary JSON；打印逐split训练与CV分数；依赖s | B-rat: 这一步先处理分子特征再搜索随机森林参数，日志列出了特征数量和交叉验证成绩，还打印了预测标签的数量，方便回查训练配置
   - t44s4@1791613127-299358: A=1 B=2 | A-rat: BioPsyKit睡眠管线执行写imu_pred.json；打印endpoints完整值；睡眠终点正确性依赖管线黑盒故F | B-rat: 这里用三轴加速度运行睡眠预测流程，日志显示流水线已完成并返回多项结果，但输出在保存部分之前就截断了，无法确认文件是否写出
   - t44s5@1791613127-299358: A=1 B=2 | A-rat: 管线确认重跑写imu_pred.json；打印endpoints值；eval现成 | B-rat: 重新运行睡眠预测并保存三个终点指标，日志回读了入睡时间和醒来时间以及睡眠时长，保存内容比较明确，可以直接核对
