@@ -1,0 +1,98 @@
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 5 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 5 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 5 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 5 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 5 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 5 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 5 --arm local_replace --edit-model Qwen/Qwen3-8B --edit-base-url http://127.0.0.1:8001/v1 --edit-timeout-s 300 --edit-max-tokens 4096 --edit-extra-body '{"chat_template_kwargs":{"enable_thinking":false}}'
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 4 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 4 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 4 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 4 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 4 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 4 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 4 --arm local_replace --edit-model Qwen/Qwen3-8B --edit-base-url http://127.0.0.1:8001/v1 --edit-timeout-s 300 --edit-max-tokens 4096 --edit-extra-body '{"chat_template_kwargs":{"enable_thinking":false}}'
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 3 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 3 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 3 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 3 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 3 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 3 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 3 --arm local_replace --edit-model Qwen/Qwen3-8B --edit-base-url http://127.0.0.1:8001/v1 --edit-timeout-s 300 --edit-max-tokens 4096 --edit-extra-body '{"chat_template_kwargs":{"enable_thinking":false}}'
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 2 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 2 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 2 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 2 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 2 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 2 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 2 --arm local_replace --edit-model Qwen/Qwen3-8B --edit-base-url http://127.0.0.1:8001/v1 --edit-timeout-s 300 --edit-max-tokens 4096 --edit-extra-body '{"chat_template_kwargs":{"enable_thinking":false}}'
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 1 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 1 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 1 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 1 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 1 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 1 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 1 --arm local_replace --edit-model Qwen/Qwen3-8B --edit-base-url http://127.0.0.1:8001/v1 --edit-timeout-s 300 --edit-max-tokens 4096 --edit-extra-body '{"chat_template_kwargs":{"enable_thinking":false}}'
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 9 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 9 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 9 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 9 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 9 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 9 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 9 --arm local_replace --edit-model Qwen/Qwen3-8B --edit-base-url http://127.0.0.1:8001/v1 --edit-timeout-s 300 --edit-max-tokens 4096 --edit-extra-body '{"chat_template_kwargs":{"enable_thinking":false}}'
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 8 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 8 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 8 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 8 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 8 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 8 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 8 --arm local_replace --edit-model Qwen/Qwen3-8B --edit-base-url http://127.0.0.1:8001/v1 --edit-timeout-s 300 --edit-max-tokens 4096 --edit-extra-body '{"chat_template_kwargs":{"enable_thinking":false}}'
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 7 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 7 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 7 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 7 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 7 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 7 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 7 --arm local_replace --edit-model Qwen/Qwen3-8B --edit-base-url http://127.0.0.1:8001/v1 --edit-timeout-s 300 --edit-max-tokens 4096 --edit-extra-body '{"chat_template_kwargs":{"enable_thinking":false}}'
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 6 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 6 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 6 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 6 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 6 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 6 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 6 --arm local_replace --edit-model Qwen/Qwen3-8B --edit-base-url http://127.0.0.1:8001/v1 --edit-timeout-s 300 --edit-max-tokens 4096 --edit-extra-body '{"chat_template_kwargs":{"enable_thinking":false}}'
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 5 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 5 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 5 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 5 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 5 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 5 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 5 --arm local_replace --edit-model Qwen/Qwen3-8B --edit-base-url http://127.0.0.1:8001/v1 --edit-timeout-s 300 --edit-max-tokens 4096 --edit-extra-body '{"chat_template_kwargs":{"enable_thinking":false}}'
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 4 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 4 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 4 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 4 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 4 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 4 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 4 --arm local_replace --edit-model Qwen/Qwen3-8B --edit-base-url http://127.0.0.1:8001/v1 --edit-timeout-s 300 --edit-max-tokens 4096 --edit-extra-body '{"chat_template_kwargs":{"enable_thinking":false}}'
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 3 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 3 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 3 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 3 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 3 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 3 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 3 --arm local_replace --edit-model Qwen/Qwen3-8B --edit-base-url http://127.0.0.1:8001/v1 --edit-timeout-s 300 --edit-max-tokens 4096 --edit-extra-body '{"chat_template_kwargs":{"enable_thinking":false}}'
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 2 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 2 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 2 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 2 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 2 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 2 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 2 --arm local_replace --edit-model Qwen/Qwen3-8B --edit-base-url http://127.0.0.1:8001/v1 --edit-timeout-s 300 --edit-max-tokens 4096 --edit-extra-body '{"chat_template_kwargs":{"enable_thinking":false}}'
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 1 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 1 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 1 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 1 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 1 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 1 --arm local_replace --edit-model deepseek-v3.2
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 1 --arm local_replace --edit-model Qwen/Qwen3-8B --edit-base-url http://127.0.0.1:8001/v1 --edit-timeout-s 300 --edit-max-tokens 4096 --edit-extra-body '{"chat_template_kwargs":{"enable_thinking":false}}'

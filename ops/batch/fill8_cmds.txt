@@ -1,0 +1,27 @@
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 4 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 4 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 4 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_40/frontier/1791613483-305791 --at-step 4 --arm local_replace --edit-model deepseek-chat --edit-model-snapshot 20260926
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791614180-321913 --at-step 4 --arm local_replace --edit-model deepseek-chat --edit-model-snapshot 20260926
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791612902-279436 --at-step 6 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791612902-279436 --at-step 6 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791612902-279436 --at-step 6 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_60/frontier/1791612902-279436 --at-step 6 --arm local_replace --edit-model deepseek-chat --edit-model-snapshot 20260926
+python3 scripts/run_cf_point.py --parent-run runs/sab_85/frontier/1791613931-318581 --at-step 2 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_85/frontier/1791613931-318581 --at-step 2 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_85/frontier/1791613931-318581 --at-step 2 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_85/frontier/1791613931-318581 --at-step 2 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_85/frontier/1791613931-318581 --at-step 2 --arm local_replace --edit-model deepseek-chat --edit-model-snapshot 20260926
+python3 scripts/run_cf_point.py --parent-run runs/sab_85/frontier/1791613931-318581 --at-step 2 --arm local_replace --edit-model deepseek-chat --edit-model-snapshot 20260926
+python3 scripts/run_cf_point.py --parent-run runs/sab_92/frontier/1791614994-362003 --at-step 1 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_92/frontier/1791614994-362003 --at-step 1 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_92/frontier/1791614994-362003 --at-step 1 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_92/frontier/1791614994-362003 --at-step 1 --arm frontier_resample
+python3 scripts/run_cf_point.py --parent-run runs/sab_92/frontier/1791614994-362003 --at-step 1 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_92/frontier/1791614994-362003 --at-step 1 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_92/frontier/1791614994-362003 --at-step 1 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_92/frontier/1791614994-362003 --at-step 1 --arm local_replace --edit-model gpt-5.4-mini-2026-03-17 --edit-model-snapshot 2026-03-17
+python3 scripts/run_cf_point.py --parent-run runs/sab_92/frontier/1791614994-362003 --at-step 1 --arm local_replace --edit-model deepseek-chat --edit-model-snapshot 20260926
+python3 scripts/run_cf_point.py --parent-run runs/sab_92/frontier/1791614994-362003 --at-step 1 --arm local_replace --edit-model deepseek-chat --edit-model-snapshot 20260926
+python3 scripts/run_cf_point.py --parent-run runs/sab_92/frontier/1791614994-362003 --at-step 1 --arm local_replace --edit-model deepseek-chat --edit-model-snapshot 20260926
+python3 scripts/run_cf_point.py --parent-run runs/sab_92/frontier/1791614994-362003 --at-step 1 --arm local_replace --edit-model deepseek-chat --edit-model-snapshot 20260926
