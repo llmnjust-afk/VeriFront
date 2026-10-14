@@ -3,12 +3,12 @@
 
 ## T1 Run inventory decomposition (A1)
 
-- total result.json files: **756**
-- in-point (ready) runs: **689**; extras (parent not in point list): **67**
-- per-arm in-point: ds 158, mini 210, qwen 126, resample 195
+- total result.json files: **772**
+- in-point (ready) runs: **705**; extras (parent not in point list): **67**
+- per-arm in-point: ds 162, mini 214, qwen 130, resample 199
 - (point,arm) cells with n>2 (audit trail of补齐/复核): 84; max n = 34
-- status: {'completed': 679, 'budget_exhausted': 10}
-- cf_status: {'completed': 679, 'budget_exhausted': 10}
+- status: {'completed': 695, 'budget_exhausted': 10}
+- cf_status: {'completed': 695, 'budget_exhausted': 10}
 
 ## T2 All 38 point-instances x arm (successes/n [Wilson95%])
 
@@ -21,7 +21,9 @@
 | t18s2 | critical_success | 322475 | 5/6 (0.83 [0.44,0.97]) | 5/6 (0.83 [0.44,0.97]) | 6/6 (1.00 [0.61,1.00]) | 4/4 (1.00 [0.51,1.00]) |
 | t18s3 | critical_success | 322475 | 5/6 (0.83 [0.44,0.97]) | 5/6 (0.83 [0.44,0.97]) | 4/6 (0.67 [0.30,0.90]) | 4/4 (1.00 [0.51,1.00]) |
 | t34s1 | critical_failure | 279147 | 0/2 (0.00 [0.00,0.66]) | 0/2 (0.00 [0.00,0.66]) | 0/2 (0.00 [0.00,0.66]) | - |
+| t34s1 | neutral | 321498 | 0/2 (0.00 [0.00,0.66]) | 0/2 (0.00 [0.00,0.66]) | 0/2 (0.00 [0.00,0.66]) | 2/2 (1.00 [0.34,1.00]) |
 | t34s2 | critical_failure | 321498 | 0/2 (0.00 [0.00,0.66]) | 0/2 (0.00 [0.00,0.66]) | 0/2 (0.00 [0.00,0.66]) | - |
+| t35s1 | critical_failure | 276937 | 0/2 (0.00 [0.00,0.66]) | 2/2 (1.00 [0.34,1.00]) | 2/2 (1.00 [0.34,1.00]) | 1/2 (0.50 [0.09,0.91]) |
 | t35s1 | critical_failure | 319454 | 1/4 (0.25 [0.05,0.70]) | 2/4 (0.50 [0.15,0.85]) | 4/4 (1.00 [0.51,1.00]) | 3/4 (0.75 [0.30,0.95]) |
 | t37s2 | neutral | 319742 | 2/2 (1.00 [0.34,1.00]) | 3/4 (0.75 [0.30,0.95]) | 2/2 (1.00 [0.34,1.00]) | - |
 | t37s5 | critical_success | 277512 | 2/2 (1.00 [0.34,1.00]) | 2/2 (1.00 [0.34,1.00]) | 2/2 (1.00 [0.34,1.00]) | - |
@@ -65,7 +67,7 @@
 
 ### A2: Qwen pooled-test口径分解
 
-- Qwen runs on ready points, all 7 sig instances: **124**
+- Qwen runs on ready points, all 7 sig instances: **128**
 - 口径A（6信号点，t40s2双实例排除，n=5实例）: qwen 23/61 (0.38) vs resample 46/72 (0.64), Fisher p=0.0032
 - 口径B（t40s2双实例都计入）: qwen 34/82 (0.41) vs resample 56/84 (0.67), Fisher p=0.0017
 
@@ -77,6 +79,7 @@
 | t5s2 | failure | 1/4 | 0/4 | 0/4 | - | NO (frontier-only) |
 | t34s1 | failure | 0/2 | 0/2 | 0/2 | - | NO (none repair) |
 | t34s2 | failure | 0/2 | 0/2 | 0/2 | - | NO (none repair) |
+| t35s1 | failure | 0/2 | 2/2 | 2/2 | 1/2 | WEAKENED (non-frontier repaired) |
 | t35s1 | failure | 1/4 | 2/4 | 4/4 | 3/4 | WEAKENED (non-frontier repaired) |
 | t44s4 | failure | 1/6 | 0/6 | 0/6 | 1/4 | WEAKENED (non-frontier repaired) |
 | t44s5 | failure | 0/2 | 0/2 | 0/2 | - | NO (none repair) |
@@ -84,17 +87,17 @@
 | t67s4 | failure | 0/1 | 0/1 | 0/1 | - | NO (none repair) |
 | t67s4 | failure | 0/1 | 0/1 | 0/1 | - | NO (none repair) |
 
-- critical_failure 点实例总数: **10**
-- 重算分类: 不可修复 7 + frontier-only 1 + 非前沿修复(反例) 2 = **10**
+- critical_failure 点实例总数: **11**
+- 重算分类: 不可修复 7 + frontier-only 1 + 非前沿修复(反例) 3 = **11**
 
 ## T5 Edit-step parsed-action stratification per arm (A5)
 
 | arm | code | none | final | other/blank | capability% | protocol% |
 |---|---|---|---|---|---|---|
-| resample | 195 | 0 | 0 | 0 | 100% | 0% |
-| mini | 198 | 11 | 1 | 0 | 94% | 6% |
-| ds | 134 | 23 | 1 | 0 | 85% | 15% |
-| qwen | 126 | 0 | 0 | 0 | 100% | 0% |
+| resample | 199 | 0 | 0 | 0 | 100% | 0% |
+| mini | 202 | 11 | 1 | 0 | 94% | 6% |
+| ds | 138 | 23 | 1 | 0 | 85% | 15% |
+| qwen | 130 | 0 | 0 | 0 | 100% | 0% |
 
 - protocol-failure runs (parsed none/final): 36; of which final-run success (Y=1, '自愈'): 17 (47%)
 - runs with no recoverable parsed action (blank): 0 — excluded from capability/protocol percentages
