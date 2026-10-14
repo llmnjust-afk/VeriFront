@@ -811,8 +811,124 @@ def fallback_features(ecg, fs):
         "HRV_CVNN": sdnn / mean_nni if mean_nni else np.nan,
         "HRV_CVSD": rmssd / mean_nni if mean_nni else np.nan,
         "HRV_MadNN": np.median(np.abs(rr - median_nni)),
-        "HRV
-... [TRUNCATED]
+        "HRV_MCVNN": np.median(np.abs(rr - median_nni)) / median_nni if median_nni else np.nan,
+        "HRV_IQRNN": np.percentile(rr, 75) - np.percentile(rr, 25),
+        "HRV_Prc20NN": np.percentile(rr, 20),
+        "HRV_Prc80NN": np.percentile(rr, 80),
+        "HRV_pNN50": 100.0 * nn50 / len(diff_rr) if len(diff_rr) else np.nan,
+        "HRV_pNN20": 100.0 * nn20 / len(diff_rr) if len(diff_rr) else np.nan,
+        "HRV_MinNN": np.min(rr),
+        "HRV_MaxNN": np.max(rr),
+        "HRV_HTI": len(rr) / np.max(np.histogram(rr, bins="auto")[0]),
+        "HRV_MeanHR": np.mean(60000.0 / rr),
+        "HRV_MinHR": np.min(60000.0 / rr),
+        "HRV_MaxHR": np.max(60000.0 / rr),
+    }
+
+    # Frequency domain: interpolate uneven tachogram at 4 Hz and Welch PSD.
+    t_rr = np.cumsum(rr) / 1000.0
+    t_mid = t_rr - rr / 2000.0
+    if len(t_mid) >= 4 and (t_mid[-1] - t_mid[0]) > 10:
+        fs_i = 4.0
+        ti = np.arange(t_mid[0], t_mid[-1], 1.0 / fs_i)
+        rr_i = np.interp(ti, t_mid, rr)
+        rr_i = signal.detrend(rr_i)
+        nperseg = min(256, len(rr_i))
+        freqs, psd = signal.welch(rr_i, fs=fs_i, nperseg=nperseg, window="hann")
+        def band_power(lo, hi):
+            mask = (freqs >= lo) & (freqs < hi)
+            if np.sum(mask) < 1:
+                return np.nan
+            return float(np.trapz(psd[mask], freqs[mask]))
+        ulf = band_power(0.0, 0.0033)
+        vlf = band_power(0.0033, 0.04)
+        lf = band_power(0.04, 0.15)
+        hf = band_power(0.15, 0.40)
+        total = band_power(0.0, 0.40)
+        lf_hf = lf / hf if hf and np.isfinite(hf) and hf > 0 else np.nan
+        lfnu = 100.0 * lf / (lf + hf) if np.isfinite(lf + hf) and (lf + hf) > 0 else np.nan
+        hfnu = 100.0 * hf / (lf + hf) if np.isfinite(lf + hf) and (lf + hf) > 0 else np.nan
+    else:
+        ulf = vlf = lf = hf = total = lf_hf = lfnu = hfnu = np.nan
+
+    feats.update({
+        "HRV_ULF": ulf,
+        "HRV_VLF": vlf,
+        "HRV_LF": lf,
+        "HRV_HF": hf,
+        "HRV_TP": total,
+        "HRV_LFHF": lf_hf,
+        "HRV_LFn": lfnu,
+        "HRV_HFn": hfnu,
+    })
+
+    # Nonlinear/Poincare/entropy/fractal features.
+    if len(diff_rr) > 1:
+        sd1 = np.sqrt(0.5) * np.std(diff_rr, ddof=1)
+        sd2_sq = 2 * sdnn ** 2 - 0.5 * np.std(diff_rr, ddof=1) ** 2
+        sd2 = np.sqrt(sd2_sq) if sd2_sq > 0 else np.nan
+    else:
+        sd1 = sd2 = np.nan
+
+    feats.update({
+        "HRV_SD1": sd1,
+        "HRV_SD2": sd2,
+        "HRV_SD1SD2": sd1 / sd2 if sd2 and np.isfinite(sd2) and sd2 > 0 else np.nan,
+        "HRV_S": math.pi * sd1 * sd2 if np.isfinite(sd1) and np.isfinite(sd2) else np.nan,
+        "HRV_CSI": sd2 / sd1 if sd1 and np.isfinite(sd1) and sd1 > 0 else np.nan,
+        "HRV_CVI": np.log10(sd1 * sd2) if np.isfinite(sd1) and np.isfinite(sd2) and sd1 * sd2 > 0 else np.nan,
+        "HRV_SampEn": sample_entropy(rr, m=2),
+        "HRV_ApEn": approximate_entropy(rr, m=2),
+        "HRV_HFD": higuchi_fd(rr, kmax=min(10, max(2, len(rr)//4))),
+        "HRV_DFA_alpha": dfa_alpha(rr),
+        "RPeak_Count": float(len(peaks)),
+        "Recording_Duration_s": float(len(ecg) / fs),
+        "Mean_HR_bpm_from_peaks": float(60000.0 / mean_nni),
+    })
+
+    return _sanitize_features(feats), peaks
+
+
+def main():
+    if not DATA_PATH.exists():
+        raise FileNotFoundError(f"Missing input file: {DATA_PATH}")
+
+    df = pd.read_csv(DATA_PATH)
+    if "ECG" not in df.columns:
+        raise ValueError(f"ECG column not found. Columns: {list(df.columns)}")
+
+    ecg = pd.to_numeric(df["ECG"], errors="coerce").interpolate().bfill().ffill().to_numpy(dtype=float)
+    print(f"Loaded {DATA_PATH}: rows={len(df)}, columns={list(df.columns)}, duration={len(ecg)/FS:.2f}s")
+    print(f"ECG summary: mean={np.mean(ecg):.6g}, std={np.std(ecg):.6g}, min={np.min(ecg):.6g}, max={np.max(ecg):.6g}")
+
+    features, peaks = try_neurokit(ecg, FS)
+    if features is None:
+        features, peaks = fallback_features(ecg, FS)
+
+    features = _sanitize_features(features)
+    # Stable ordering: provenance first, then alphabetical HRV features.
+    ordered_keys = []
+    for k in ["Recording_Duration_s", "RPeak_Count", "Mean_HR_bpm_from_peaks"]:
+        if k in features:
+            ordered_keys.append(k)
+    ordered_keys += sorted([k for k in features if k not in ordered_keys])
+    out_df = pd.DataFrame([{k: features[k] for k in ordered_keys}])
+
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out_df.to_csv(OUT_PATH, index=False)
+
+    rr = rr_intervals_ms(peaks, FS)
+    print(f"Detected R peaks: {len(peaks)}")
+    print(f"Valid RR intervals: {len(rr)}")
+    if len(rr):
+        print(f"RR mean={np.mean(rr):.3f} ms, SDNN={np.std(rr, ddof=1) if len(rr)>1 else np.nan:.3f} ms, HR={60000/np.mean(rr):.3f} bpm")
+    print(f"Saved {out_df.shape[1]} HRV/provenance columns to {OUT_PATH}")
+    print("Output preview:")
+    print(out_df.to_string(index=False, max_cols=200))
+
+
+if __name__ == "__main__":
+    main()
 [OBS t34 step 1 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Loaded biosignals/bio_resting_5min_100hz.csv: rows=29900, columns=['ECG', 'PPG', 'RSP'], duration=299.00s | ECG summary: mean=-0.00708476, std=0.0411407, min=-0.708476, max=0.894532 | Used NeuroKit2 implementation. | Detected R peaks: 432 | Valid RR intervals: 431 | RR mean=692.436 ms, SDNN=48.841 ms, HR=86.651 bpm | Saved 94 HRV/provenance columns to pred_results/hrv_analysis_pred.csv | Output preview: |  Recording_Duration_s  RPeak_Count  Mean_HR_bpm_from_peaks    HRV_AI  HRV_ApEn  HRV_C1a  HRV_C1d  HRV_C2a  HRV_C2d   HRV_CD  HRV_CMSEn  HRV_CSI  HRV_CSI_Modified  HRV_CVI  HRV_CVNN  HRV_CVSD   HRV_Ca   HRV_Cd  HRV_DFA_alpha1  HRV_DFA_alpha2  HRV_FuzzyEn    HRV_GI     HRV_HF  HRV_HFD  HRV_HFn  HRV_HTI  HRV_IALS  HRV_IQRNN  HRV_KFD    HRV_LF  HRV_LFHF  HRV_LFn  HRV_LZC  HRV_LnHF  HRV_MCVNN  HRV_MFDFA_alpha1_Asymmetry  HRV_MFDFA_alpha1_Delta  HRV_MFDFA_alpha1_Fluctuation  HRV_MFDFA_alpha1_Increment  HRV_MFDFA_alpha1_Max  HRV_MFDFA_alpha1_Mean  HRV_MFDFA_alpha1_Peak  HRV_MFDFA_alpha1_Width  HRV_MFDFA_alpha2_Asymmetry  HRV_MFDFA_alpha2_Delta  HRV_MFDFA_alpha2_Fluctuation  HRV_MFDFA_alpha2_Increment  HRV_MFDFA_alpha2_Max  HRV_MFDFA_alpha2_Mean  HRV_MFDFA_ ... [TRUNCATED]
 
@@ -1231,8 +1347,124 @@ def compute_rrv(path="biosignals/bio_eventrelated_100hz.csv", fs=100.0):
     # Extract peaks of the respiratory-rate signal.
     if np.isfinite(rr_signal).sum() > int(fs * 5):
         rr_for_peaks = rr_signal.copy()
-        rr_for_peaks[~np.isfinite(r
-... [TRUNCATED]
+        rr_for_peaks[~np.isfinite(rr_for_peaks)] = np.nanmedian(rr_for_peaks)
+        rr_prom = max(0.1 * np.nanstd(rr_for_peaks), 1e-9)
+        rr_peaks, _ = signal.find_peaks(rr_for_peaks, distance=int(2.0 * fs), prominence=rr_prom)
+        rr_peak_times = rr_peaks / fs
+        rr_peak_values = rr_signal[rr_peaks]
+    else:
+        rr_peaks = np.array([], dtype=int)
+        rr_peak_times = np.array([])
+        rr_peak_values = np.array([])
+
+    intervals = np.diff(peak_times)
+    valid_intervals = intervals[(intervals >= 1.0) & (intervals <= 12.0)]
+    if len(valid_intervals) >= max(3, int(0.5 * len(intervals))):
+        intervals = valid_intervals
+    rate_from_intervals = 60.0 / intervals if len(intervals) else np.array([])
+
+    diff_intervals = np.diff(intervals)
+    abs_diff = np.abs(diff_intervals)
+
+    # Poincare features on breath intervals.
+    if len(diff_intervals) >= 1:
+        sd1 = np.sqrt(0.5) * safe_std(diff_intervals, ddof=1)
+        sdnn = safe_std(intervals, ddof=1)
+        sd2_val = np.sqrt(max(0.0, 2 * sdnn * sdnn - 0.5 * safe_std(diff_intervals, ddof=1) ** 2)) if np.isfinite(sdnn) else np.nan
+    else:
+        sd1, sd2_val = np.nan, np.nan
+
+    features = {
+        "sampling_rate_hz": fs,
+        "duration_seconds": duration,
+        "rsp_samples": len(rsp),
+
+        # Extracted inhalation peaks from cleaned RSP.
+        "rsp_inhalation_peak_count": int(len(peaks)),
+        "rsp_first_inhalation_peak_time_s": float(peak_times[0]) if len(peak_times) else np.nan,
+        "rsp_last_inhalation_peak_time_s": float(peak_times[-1]) if len(peak_times) else np.nan,
+        "rsp_cleaned_mean": safe_mean(cleaned),
+        "rsp_cleaned_sd": safe_std(cleaned, ddof=1),
+        "rsp_cleaned_peak_mean_amplitude": safe_mean(cleaned[peaks]) if len(peaks) else np.nan,
+        "rsp_cleaned_peak_sd_amplitude": safe_std(cleaned[peaks], ddof=1) if len(peaks) else np.nan,
+
+        # Respiratory-rate signal and its peaks.
+        "respiratory_rate_signal_mean_bpm": safe_mean(rr_signal),
+        "respiratory_rate_signal_sd_bpm": safe_std(rr_signal, ddof=1),
+        "respiratory_rate_signal_min_bpm": float(np.nanmin(rr_signal)) if np.isfinite(rr_signal).any() else np.nan,
+        "respiratory_rate_signal_max_bpm": float(np.nanmax(rr_signal)) if np.isfinite(rr_signal).any() else np.nan,
+        "respiratory_rate_peak_count": int(len(rr_peaks)),
+        "respiratory_rate_peak_mean_bpm": safe_mean(rr_peak_values),
+        "respiratory_rate_peak_sd_bpm": safe_std(rr_peak_values, ddof=1),
+
+        # Time-domain RRV from breath-to-breath intervals.
+        "rrv_breath_interval_count": int(len(intervals)),
+        "rrv_mean_breath_interval_s": safe_mean(intervals),
+        "rrv_median_breath_interval_s": float(np.nanmedian(intervals)) if len(intervals) else np.nan,
+        "rrv_sd_breath_interval_s": safe_std(intervals, ddof=1),
+        "rrv_min_breath_interval_s": float(np.nanmin(intervals)) if len(intervals) else np.nan,
+        "rrv_max_breath_interval_s": float(np.nanmax(intervals)) if len(intervals) else np.nan,
+        "rrv_range_breath_interval_s": float(np.nanmax(intervals) - np.nanmin(intervals)) if len(intervals) else np.nan,
+        "rrv_cv_breath_interval": float(safe_std(intervals, ddof=1) / safe_mean(intervals)) if len(intervals) and safe_mean(intervals) != 0 else np.nan,
+        "rrv_rmssd_s": float(np.sqrt(np.mean(diff_intervals ** 2))) if len(diff_intervals) else np.nan,
+        "rrv_sdsd_s": safe_std(diff_intervals, ddof=1),
+        "rrv_mad_breath_interval_s": float(stats.median_abs_deviation(intervals, nan_policy="omit")) if len(intervals) else np.nan,
+        "rrv_pnn50": float(np.mean(abs_diff > 0.05)) if len(abs_diff) else np.nan,
+        "rrv_pnn250": float(np.mean(abs_diff > 0.25)) if len(abs_diff) else np.nan,
+        "rrv_pnn500": float(np.mean(abs_diff > 0.50)) if len(abs_diff) else np.nan,
+        "rrv_mean_rate_bpm": safe_mean(rate_from_intervals),
+        "rrv_median_rate_bpm": float(np.nanmedian(rate_from_intervals)) if len(rate_from_intervals) else np.nan,
+        "rrv_sd_rate_bpm": safe_std(rate_from_intervals, ddof=1),
+        "rrv_cv_rate": float(safe_std(rate_from_intervals, ddof=1) / safe_mean(rate_from_intervals)) if len(rate_from_intervals) and safe_mean(rate_from_intervals) != 0 else np.nan,
+
+        # Nonlinear RRV.
+        "rrv_poincare_sd1_s": float(sd1) if np.isfinite(sd1) else np.nan,
+        "rrv_poincare_sd2_s": float(sd2_val) if np.isfinite(sd2_val) else np.nan,
+        "rrv_poincare_sd1_sd2_ratio": float(sd1 / sd2_val) if np.isfinite(sd1) and np.isfinite(sd2_val) and sd2_val != 0 else np.nan,
+        "rrv_sample_entropy": sample_entropy(intervals, m=2),
+        "rrv_approximate_entropy": approximate_entropy(intervals, m=2),
+        "rrv_dfa_alpha": dfa_alpha(intervals),
+        "rrv_skewness_breath_interval": float(stats.skew(intervals, bias=False)) if len(intervals) >= 3 else np.nan,
+        "rrv_kurtosis_breath_interval": float(stats.kurtosis(intervals, bias=False)) if len(intervals) >= 4 else np.nan,
+    }
+
+    features.update(frequency_features(rate_times, rate_bpm))
+
+    return features
+
+
+def main():
+    out_dir = "pred_results"
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, "rrv_analysis_pred.csv")
+
+    features = compute_rrv("biosignals/bio_eventrelated_100hz.csv", fs=100.0)
+    result = pd.DataFrame([features])
+    # Stable column order: as inserted.
+    result.to_csv(out_path, index=False)
+
+    print(f"Saved RRV analysis to: {out_path}")
+    print(f"Shape: {result.shape}")
+    print("Key extracted values:")
+    key_cols = [
+        "duration_seconds",
+        "rsp_inhalation_peak_count",
+        "respiratory_rate_peak_count",
+        "rrv_breath_interval_count",
+        "rrv_mean_rate_bpm",
+        "rrv_sd_rate_bpm",
+        "rrv_rmssd_s",
+        "rrv_lf_power",
+        "rrv_hf_power",
+        "rrv_sample_entropy",
+    ]
+    print(result[key_cols].to_string(index=False))
+    print("All columns:")
+    print(", ".join(result.columns))
+
+
+if __name__ == "__main__":
+    main()
 [OBS t35 step 1 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Saved RRV analysis to: pred_results/rrv_analysis_pred.csv | Shape: (1, 53) | Key extracted values: |  duration_seconds  rsp_inhalation_peak_count  respiratory_rate_peak_count  rrv_breath_interval_count  rrv_mean_rate_bpm  rrv_sd_rate_bpm  rrv_rmssd_s  rrv_lf_power  rrv_hf_power  rrv_sample_entropy |             149.0                          0                            0                          0                NaN              NaN          NaN           NaN           NaN                 NaN | All columns: | sampling_rate_hz, duration_seconds, rsp_samples, rsp_inhalation_peak_count, rsp_first_inhalation_peak_time_s, rsp_last_inhalation_peak_time_s, rsp_cleaned_mean, rsp_cleaned_sd, rsp_cleaned_peak_mean_amplitude, rsp_cleaned_peak_sd_amplitude, respiratory_rate_signal_mean_bpm, respiratory_rate_signal_sd_bpm, respiratory_rate_signal_min_bpm, respiratory_rate_signal_max_bpm, respiratory_rate_peak_count, respiratory_rate_peak_mean_bpm, respiratory_rate_peak_sd_bpm, rrv_breath_interval_count, rrv_mean_breath_interval_s, rrv_median_breath_interval_s, rrv_sd_breath_interval_s, rrv_min_breath_interval_s, rrv_max_breath_interval_s, rrv_range_breath_interv ... [TRUNCATED]
 
@@ -1557,8 +1789,285 @@ def dfa_alpha(x, scale_min, scale_max):
 def higuchi_fd(x, kmax=10):
     """Higuchi fractal dimension."""
     x = np.asarray(x, dtype=float)
-    x = x
-... [TRUNCATED]
+    x = x[np.isfinite(x)]
+    n = len(x)
+    if n < kmax * 2 or np.std(x) == 0:
+        return np.nan
+    lk = []
+    kk = []
+    for k in range(1, kmax + 1):
+        lm = []
+        for m in range(k):
+            idx = np.arange(m, n, k)
+            if len(idx) < 2:
+                continue
+            dist = np.sum(np.abs(np.diff(x[idx])))
+            norm = (n - 1) / ((len(idx) - 1) * k)
+            lm.append((dist * norm) / k)
+        if len(lm) > 0 and np.mean(lm) > 0:
+            lk.append(np.mean(lm))
+            kk.append(k)
+    if len(kk) < 3:
+        return np.nan
+    slope, _ = np.polyfit(np.log(1.0 / np.asarray(kk)), np.log(lk), 1)
+    return float(slope)
+
+
+def spectral_entropy_from_psd(psd):
+    psd = np.asarray(psd, dtype=float)
+    psd = psd[np.isfinite(psd) & (psd >= 0)]
+    total = psd.sum()
+    if total <= 0 or len(psd) == 0:
+        return np.nan
+    p = psd / total
+    p = p[p > 0]
+    return float(-np.sum(p * np.log2(p)) / np.log2(len(psd))) if len(psd) > 1 else np.nan
+
+
+def band_power(freqs, psd, lo, hi):
+    freqs = np.asarray(freqs)
+    psd = np.asarray(psd)
+    mask = (freqs >= lo) & (freqs < hi)
+    if mask.sum() < 1:
+        return np.nan, np.nan
+    power = float(np.trapz(psd[mask], freqs[mask])) if mask.sum() >= 2 else 0.0
+    peak_freq = float(freqs[mask][np.argmax(psd[mask])])
+    return power, peak_freq
+
+
+def frequency_features(interval_times_s, intervals_s):
+    """
+    Frequency-domain RRV from interpolated breath-interval tachogram.
+    Frequencies are cycles per second/Hz over the interval series in time.
+    """
+    features = {}
+    names = [
+        "rrv_vlf_power", "rrv_lf_power", "rrv_hf_power", "rrv_total_power",
+        "rrv_lf_hf_ratio", "rrv_lf_norm", "rrv_hf_norm",
+        "rrv_vlf_peak_hz", "rrv_lf_peak_hz", "rrv_hf_peak_hz",
+        "rrv_psd_peak_hz", "rrv_spectral_entropy"
+    ]
+    for name in names:
+        features[name] = np.nan
+
+    t = np.asarray(interval_times_s, dtype=float)
+    x = np.asarray(intervals_s, dtype=float)
+    good = np.isfinite(t) & np.isfinite(x)
+    t, x = t[good], x[good]
+
+    if len(x) < 8 or (t[-1] - t[0]) < 30:
+        return features
+
+    order = np.argsort(t)
+    t = t[order]
+    x = x[order]
+    uniq_t, uniq_idx = np.unique(t, return_index=True)
+    t = uniq_t
+    x = x[uniq_idx]
+    if len(x) < 8:
+        return features
+
+    fs_interp = 4.0
+    grid = np.arange(t[0], t[-1], 1.0 / fs_interp)
+    if len(grid) < 32:
+        return features
+
+    y = np.interp(grid, t, x)
+    y = signal.detrend(y, type="linear")
+    y = y - np.mean(y)
+
+    nperseg = min(256, len(y))
+    if nperseg < 16 or np.std(y) <= 0:
+        return features
+
+    freqs, psd = signal.welch(
+        y,
+        fs=fs_interp,
+        window="hann",
+        nperseg=nperseg,
+        noverlap=nperseg // 2,
+        detrend="constant",
+        scaling="density",
+    )
+
+    # Common variability bands, reported for RRV as low-frequency variability
+    # in the breath-interval sequence.
+    vlf, vlf_peak = band_power(freqs, psd, 0.0033, 0.04)
+    lf, lf_peak = band_power(freqs, psd, 0.04, 0.15)
+    hf, hf_peak = band_power(freqs, psd, 0.15, 0.40)
+    total, _ = band_power(freqs, psd, 0.0033, 0.40)
+
+    lf_hf = lf / hf if np.isfinite(lf) and np.isfinite(hf) and hf > 0 else np.nan
+    denom = lf + hf if np.isfinite(lf) and np.isfinite(hf) else np.nan
+    lf_norm = 100.0 * lf / denom if np.isfinite(denom) and denom > 0 else np.nan
+    hf_norm = 100.0 * hf / denom if np.isfinite(denom) and denom > 0 else np.nan
+
+    in_band = (freqs >= 0.0033) & (freqs <= 0.40)
+    psd_peak = float(freqs[in_band][np.argmax(psd[in_band])]) if in_band.sum() else np.nan
+
+    features.update({
+        "rrv_vlf_power": vlf,
+        "rrv_lf_power": lf,
+        "rrv_hf_power": hf,
+        "rrv_total_power": total,
+        "rrv_lf_hf_ratio": lf_hf,
+        "rrv_lf_norm": lf_norm,
+        "rrv_hf_norm": hf_norm,
+        "rrv_vlf_peak_hz": vlf_peak,
+        "rrv_lf_peak_hz": lf_peak,
+        "rrv_hf_peak_hz": hf_peak,
+        "rrv_psd_peak_hz": psd_peak,
+        "rrv_spectral_entropy": spectral_entropy_from_psd(psd[in_band]) if in_band.sum() else np.nan,
+    })
+    return features
+
+
+def compute_rrv_features(rsp, fs):
+    cleaned = clean_rsp_rspband(rsp, fs)
+    peak_samples, peak_props = detect_inhalation_peaks(cleaned, fs)
+    peak_times = peak_samples / fs
+    intervals = np.diff(peak_times)
+    valid_mask = interval_outlier_mask(intervals)
+    valid_intervals = intervals[valid_mask]
+    valid_interval_times = peak_times[1:][valid_mask]
+
+    rate_signal = make_rate_signal(peak_samples, intervals, valid_mask, len(rsp), fs)
+    rate_peaks, rate_peak_props = detect_rate_peaks(rate_signal, fs)
+
+    rr_bpm = 60.0 / valid_intervals if len(valid_intervals) else np.array([], dtype=float)
+    diff_intervals = np.diff(valid_intervals) if len(valid_intervals) >= 2 else np.array([], dtype=float)
+
+    features = {}
+
+    # Metadata / peak extraction.
+    duration_s = len(rsp) / fs
+    features["sampling_rate_hz"] = fs
+    features["recording_duration_s"] = duration_s
+    features["recording_duration_min"] = duration_s / 60.0
+    features["rsp_clean_mean"] = safe_mean(cleaned)
+    features["rsp_clean_sd"] = safe_std(cleaned)
+    features["rsp_clean_min"] = float(np.nanmin(cleaned))
+    features["rsp_clean_max"] = float(np.nanmax(cleaned))
+    features["rsp_inhalation_peak_count_raw"] = int(len(peak_samples))
+    features["rsp_valid_interval_count"] = int(len(valid_intervals))
+    features["rsp_rejected_interval_count"] = int(len(intervals) - len(valid_intervals))
+    features["rsp_inhalation_peak_rate_per_min"] = float(len(peak_samples) / (duration_s / 60.0)) if duration_s > 0 else np.nan
+
+    if len(peak_samples) > 0:
+        features["rsp_first_inhalation_peak_s"] = float(peak_samples[0] / fs)
+        features["rsp_last_inhalation_peak_s"] = float(peak_samples[-1] / fs)
+        features["rsp_mean_inhalation_peak_amplitude"] = safe_mean(cleaned[peak_samples])
+        features["rsp_sd_inhalation_peak_amplitude"] = safe_std(cleaned[peak_samples])
+    else:
+        features["rsp_first_inhalation_peak_s"] = np.nan
+        features["rsp_last_inhalation_peak_s"] = np.nan
+        features["rsp_mean_inhalation_peak_amplitude"] = np.nan
+        features["rsp_sd_inhalation_peak_amplitude"] = np.nan
+
+    # Respiratory-rate signal peak features.
+    features["resp_rate_signal_peak_count"] = int(len(rate_peaks))
+    features["resp_rate_signal_peak_rate_per_min"] = float(len(rate_peaks) / (duration_s / 60.0)) if duration_s > 0 else np.nan
+    features["resp_rate_signal_mean_bpm"] = safe_mean(rate_signal)
+    features["resp_rate_signal_sd_bpm"] = safe_std(rate_signal)
+    features["resp_rate_signal_min_bpm"] = float(np.nanmin(rate_signal)) if np.isfinite(rate_signal).any() else np.nan
+    features["resp_rate_signal_max_bpm"] = float(np.nanmax(rate_signal)) if np.isfinite(rate_signal).any() else np.nan
+    features["resp_rate_signal_peak_mean_bpm"] = safe_mean(rate_signal[rate_peaks]) if len(rate_peaks) else np.nan
+    features["resp_rate_signal_peak_sd_bpm"] = safe_std(rate_signal[rate_peaks]) if len(rate_peaks) else np.nan
+
+    # Time-domain RRV indices on breath-to-breath intervals.
+    features["rrv_mean_bbi_s"] = safe_mean(valid_intervals)
+    features["rrv_median_bbi_s"] = safe_median(valid_intervals)
+    features["rrv_sd_bbi_s"] = safe_std(valid_intervals)
+    features["rrv_var_bbi_s2"] = float(np.nanvar(valid_intervals, ddof=1)) if len(valid_intervals) > 1 else np.nan
+    features["rrv_min_bbi_s"] = float(np.nanmin(valid_intervals)) if len(valid_intervals) else np.nan
+    features["rrv_max_bbi_s"] = float(np.nanmax(valid_intervals)) if len(valid_intervals) else np.nan
+    features["rrv_range_bbi_s"] = features["rrv_max_bbi_s"] - features["rrv_min_bbi_s"] if len(valid_intervals) else np.nan
+    features["rrv_iqr_bbi_s"] = safe_percentile(valid_intervals, 75) - safe_percentile(valid_intervals, 25) if len(valid_intervals) else np.nan
+    features["rrv_mad_bbi_s"] = float(stats.median_abs_deviation(valid_intervals, nan_policy="omit")) if len(valid_intervals) else np.nan
+    features["rrv_cv_bbi"] = features["rrv_sd_bbi_s"] / features["rrv_mean_bbi_s"] if np.isfinite(features["rrv_sd_bbi_s"]) and features["rrv_mean_bbi_s"] else np.nan
+
+    features["rrv_rmssd_s"] = float(np.sqrt(np.mean(diff_intervals ** 2))) if len(diff_intervals) else np.nan
+    features["rrv_sdsd_s"] = safe_std(diff_intervals)
+    features["rrv_mean_abs_successive_diff_s"] = safe_mean(np.abs(diff_intervals)) if len(diff_intervals) else np.nan
+    features["rrv_pnn50_percent"] = float(100 * np.mean(np.abs(diff_intervals) > 0.050)) if len(diff_intervals) else np.nan
+    features["rrv_pnn100_percent"] = float(100 * np.mean(np.abs(diff_intervals) > 0.100)) if len(diff_intervals) else np.nan
+    features["rrv_pnn200_percent"] = float(100 * np.mean(np.abs(diff_intervals) > 0.200)) if len(diff_intervals) else np.nan
+
+    # Respiratory-rate summary from breath intervals.
+    features["rrv_mean_resp_rate_bpm"] = safe_mean(rr_bpm)
+    features["rrv_median_resp_rate_bpm"] = safe_median(rr_bpm)
+    features["rrv_sd_resp_rate_bpm"] = safe_std(rr_bpm)
+    features["rrv_min_resp_rate_bpm"] = float(np.nanmin(rr_bpm)) if len(rr_bpm) else np.nan
+    features["rrv_max_resp_rate_bpm"] = float(np.nanmax(rr_bpm)) if len(rr_bpm) else np.nan
+    features["rrv_cv_resp_rate"] = features["rrv_sd_resp_rate_bpm"] / features["rrv_mean_resp_rate_bpm"] if np.isfinite(features["rrv_sd_resp_rate_bpm"]) and features["rrv_mean_resp_rate_bpm"] else np.nan
+
+    # Frequency-domain RRV.
+    features.update(frequency_features(valid_interval_times, valid_intervals))
+
+    # Nonlinear indices.
+    sd1, sd2, sd_ratio, ellipse_area = poincare_features(valid_intervals)
+    features["rrv_poincare_sd1_s"] = sd1
+    features["rrv_poincare_sd2_s"] = sd2
+    features["rrv_poincare_sd1_sd2_ratio"] = sd_ratio
+    features["rrv_poincare_ellipse_area"] = ellipse_area
+    features["rrv_sample_entropy"] = sample_entropy(valid_intervals, m=2)
+    features["rrv_approximate_entropy"] = approximate_entropy(valid_intervals, m=2)
+    features["rrv_dfa_alpha1"] = dfa_alpha(valid_intervals, scale_min=4, scale_max=16)
+    features["rrv_dfa_alpha2"] = dfa_alpha(valid_intervals, scale_min=16, scale_max=64)
+    features["rrv_higuchi_fd"] = higuchi_fd(valid_intervals, kmax=min(10, max(3, len(valid_intervals) // 5))) if len(valid_intervals) >= 20 else np.nan
+    features["rrv_skewness_bbi"] = float(stats.skew(valid_intervals, bias=False, nan_policy="omit")) if len(valid_intervals) >= 3 else np.nan
+    features["rrv_kurtosis_bbi"] = float(stats.kurtosis(valid_intervals, bias=False, nan_policy="omit")) if len(valid_intervals) >= 4 else np.nan
+
+    return features, cleaned, peak_samples, rate_signal, rate_peaks
+
+
+def main():
+    warnings.filterwarnings("ignore", category=RuntimeWarning)
+
+    if not INPUT_PATH.exists():
+        raise FileNotFoundError(f"Missing input file: {INPUT_PATH}")
+
+    df = pd.read_csv(INPUT_PATH)
+    print(f"Loaded {INPUT_PATH} with shape {df.shape}")
+    print(f"Columns: {list(df.columns)}")
+
+    if "RSP" not in df.columns:
+        raise ValueError("Input file does not contain required RSP column.")
+
+    rsp = _as_float_array(df["RSP"])
+    features, cleaned, inhalation_peaks, rate_signal, rate_peaks = compute_rrv_features(rsp, FS)
+
+    out = pd.DataFrame([features])
+    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    out.to_csv(OUTPUT_PATH, index=False)
+
+    print(f"Cleaned RSP length: {len(cleaned)} samples")
+    print(f"Detected inhalation peaks: {len(inhalation_peaks)}")
+    print(f"Detected respiratory-rate signal peaks: {len(rate_peaks)}")
+    print("Key RRV results:")
+    key_cols = [
+        "recording_duration_min",
+        "rsp_inhalation_peak_rate_per_min",
+        "rsp_valid_interval_count",
+        "rrv_mean_bbi_s",
+        "rrv_sd_bbi_s",
+        "rrv_rmssd_s",
+        "rrv_mean_resp_rate_bpm",
+        "rrv_sd_resp_rate_bpm",
+        "rrv_lf_power",
+        "rrv_hf_power",
+        "rrv_lf_hf_ratio",
+        "rrv_sample_entropy",
+        "rrv_poincare_sd1_s",
+        "rrv_poincare_sd2_s",
+    ]
+    for col in key_cols:
+        print(f"  {col}: {out.loc[0, col]}")
+    print(f"Saved {out.shape[1]} RRV feature columns to {OUTPUT_PATH}")
+
+
+if __name__ == "__main__":
+    main()
 [OBS t35 step 1 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Loaded biosignals/bio_eventrelated_100hz.csv with shape (14900, 4) | Columns: ['ECG', 'EDA', 'Photosensor', 'RSP'] | Cleaned RSP length: 14900 samples | Detected inhalation peaks: 44 | Detected respiratory-rate signal peaks: 11 | Key RRV results: |   recording_duration_min: 2.4833333333333334 |   rsp_inhalation_peak_rate_per_min: 17.71812080536913 |   rsp_valid_interval_count: 41 |   rrv_mean_bbi_s: 3.2963414634146337 |   rrv_sd_bbi_s: 0.47216922865409805 |   rrv_rmssd_s: 0.5653627154314352 |   rrv_mean_resp_rate_bpm: 18.545456420148945 |   rrv_sd_resp_rate_bpm: 2.515726772135705 |   rrv_lf_power: 0.03196606071344196 |   rrv_hf_power: 0.001780311088139523 |   rrv_lf_hf_ratio: 17.95532304797777 |   rrv_sample_entropy: 1.791759469228055 |   rrv_poincare_sd1_s: 0.4048621164462495 |   rrv_poincare_sd2_s: 0.5310124552609622 | Saved 68 RRV feature columns to pred_results/rrv_analysis_pred.csv |  | --- STDERR --- |
 

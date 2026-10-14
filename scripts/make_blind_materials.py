@@ -5,8 +5,8 @@ Fixes over v1 (ad-hoc generation, no archived script):
   1. Arm leakage: parent-run paths like /tmp/vf_work/sab_53/frontier/<uuid>/wd
      that appear verbatim inside step observations are redacted to <WORKDIR>
      (v1 leaked `frontier` in 3 points' OBS).
-  2. Truncation: STEP-CODE cap raised 2600 -> 10000 chars (17 points were cut
-     mid-script in v1); OBS cap raised 500 -> 1200.
+  2. Truncation: STEP-CODE cap raised 2600 -> 25000 chars (17 points were cut
+     mid-script in v1; the three points >10k are now complete too); OBS cap raised 500 -> 1200.
   3. TASK-DESC now sourced directly from benchmark verified.parquet `task_inst`.
   4. Archived, deterministic script (this file) replaces the one-off command.
 
@@ -100,7 +100,7 @@ def final_leak_check(text: str):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--code-cap", type=int, default=10000)
+    ap.add_argument("--code-cap", type=int, default=25000)
     ap.add_argument("--obs-cap", type=int, default=1200)
     args = ap.parse_args()
 
@@ -133,6 +133,10 @@ def main():
     bad = [(n, c[:40]) for n, c in blocks if int(n) < 80 or '\n' not in c]
     if bad:
         print("STEP-CODE BODY CHECK FAILED:", bad[:5], file=sys.stderr)
+        sys.exit(1)
+    trunc = [(n, c[-30:]) for n, c in blocks if c.rstrip().endswith('... [TRUNCATED]')]
+    if trunc:
+        print("STEP-CODE TRUNCATED (raise --code-cap):", trunc, file=sys.stderr)
         sys.exit(1)
     leaks = final_leak_check(text)
     if leaks:

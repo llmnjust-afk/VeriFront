@@ -6,8 +6,8 @@
 
 | 文件 | 校验特征 |
 |------|---------|
-| `reports/annotation/blind_materials_v2.md` | 头部标题 "Blind Annotation Materials (v2)"；38 个 POINT；每个 STEP-CODE 块含**实际代码正文**（长度 101–22322 字符，绝无仅 `step_XX.py` 文件名的块）；无 `frontier`/`resample`/`local_replace` 字样 |
-| `reports/pilot/p2_verifiability_codebook.md` | 首行标题含 **"Codebook v1.2，已冻结"**；文末有 v1.1 与 v1.2 两段变更日志 |
+| `reports/annotation/blind_materials_v2.md` | 头部标题 "Blind Annotation Materials (v2)"；38 个 POINT；每个 STEP-CODE 块含**完整实际代码正文**（101–22322 字符，全 38 点无代码截断、无仅文件名的块）；OBS 截前 1200 字符属设计选择（未见部分适用可见性原则）；无 `frontier`/`resample`/`local_replace` 字样 |
+| `reports/pilot/p2_verifiability_codebook_B.md` | 首行标题含 **"Codebook v1.3，已冻结——标注者阅读版"**；文末含 v1.1–v1.3 变更日志（阅读版不含任何标注者点级判断信息）。**不要使用 `p2_verifiability_codebook.md`（那是含内部记录的研究审计版）** |
 | `reports/annotation/p2_blind_template_annotatorB.csv` | 38 行 × 9 列，point_id 与材料逐点同序；F1–F7 与 rationale 留空待填 |
 
 ⚠️ 任何与本表校验特征不符的副本（例如标题仍为 v1.0/预注册草案、STEP-CODE 只有文件名）一律是**过期文件**，退回并从仓库 main 重新获取。
