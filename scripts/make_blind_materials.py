@@ -47,14 +47,13 @@ def oneline(text: str) -> str:
 
 
 def load_step_data(parent_run: str, step_no: int):
-    r = json.load(open(f"{parent_run}/result.json"))
-    script = None
-    for s in r.get("steps", []):
-        if int(s.get("step")) == int(step_no):
-            script = s.get("script") or ""
-            break
-    if script is None:
-        script = open(f"{parent_run}/step_{int(step_no):02d}.py").read()
+    # NOTE: result.json steps[].script stores the FILE NAME (e.g. 'step_01.py'),
+    # not the code body. Always read the executed script file itself.
+    script_path = f"{parent_run}/step_{int(step_no):02d}.py"
+    with open(script_path) as f:
+        script = f.read()
+    if "step_" in script[:32] and len(script) < 64:
+        raise ValueError(f"step file for {parent_run} step {step_no} looks like a filename, not code")
     obs = None
     with open(f"{parent_run}/trace.jsonl", errors="ignore") as f:
         for line in f:
@@ -129,6 +128,12 @@ def main():
         out.append("")
 
     text = "\n".join(out)
+    # machine check: every STEP-CODE block must contain substantive code body
+    blocks = re.findall(r"\[STEP-CODE[^\]]*\] \((\d+) chars\)\n(.+?)\n\[OBS", text, re.DOTALL)
+    bad = [(n, c[:40]) for n, c in blocks if int(n) < 80 or '\n' not in c]
+    if bad:
+        print("STEP-CODE BODY CHECK FAILED:", bad[:5], file=sys.stderr)
+        sys.exit(1)
     leaks = final_leak_check(text)
     if leaks:
         print("LEAK DETECTED:", leaks[:5], file=sys.stderr)

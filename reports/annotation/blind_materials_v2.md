@@ -6,260 +6,3886 @@ original instruction for those tasks, not truncation).
 
 ===== POINT 1/38: t18s1@1791613049-280338 =====
 [TASK-DESC] Train a Random Forest classifier to predict whether a given chemical structure (in SMILES format) poses a Drug-Induced Liver Injury (DILI) concern. The dataset's vDILIConcern column classifies 'vMost-DILI-Concern' and 'vLess-DILI-Concern' as positive, and 'vNo-DILI-Concern' and 'sider_inactive' as negative. The training dataset is split into different sets: MC (1–173), LC (174–433), NC (434–660), and sider (661–923). Use these splits to create three task configurations: MCNC (classifying MC vs NC drugs), MCLCNC (classifying MC/LC vs NC drugs), and all (classifying MC/LC vs NC/sider-inactive drugs). For each task configuration, use the training examples to perform 5-fold cross-validation and hyperparameter search. Use the model trained on the best hyperparameter and save the prediction results to "pred_results/{data_conf}_RF.csv" where data_conf is the name of different data configurations (i.e., MCNC, MCLCNC, and all). Put the chemical smiles name and predicted label (’DILI’ or ’NoDILI’)  in the ’standardised_smiles’ and ’label’ column respectively.
-[STEP-CODE t18 step 1] (10 chars)
-step_01.py
+[STEP-CODE t18 step 1] (7995 chars)
+#!/usr/bin/env python3
+"""
+Train Random Forest DILI classifiers for MCNC, MCLCNC, and all configurations.
+Outputs prediction CSVs under pred_results/{data_conf}_RF.csv with columns:
+standardised_smiles,label
+"""
+import os
+import sys
+import json
+import warnings
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
+from sklearn.metrics import make_scorer, balanced_accuracy_score, accuracy_score, roc_auc_score
+from sklearn.feature_extraction.text import HashingVectorizer
+from scipy import sparse
+
+warnings.filterwarnings("ignore")
+
+RANDOM_STATE = 42
+TRAIN_PATH = Path("dili/train.csv")
+TEST_PATH = Path("dili/test.csv")
+OUT_DIR = Path("pred_results")
+OUT_DIR.mkdir(exist_ok=True)
+
+print("Starting DILI Random Forest training workflow")
+print(f"Python: {sys.version.split()[0]}")
+print(f"Train path exists: {TRAIN_PATH.exists()} | Test path exists: {TEST_PATH.exists()}")
+
+train_df = pd.read_csv(TRAIN_PATH)
+test_df = pd.read_csv(TEST_PATH)
+
+print(f"Loaded train shape: {train_df.shape}")
+print(f"Loaded test shape: {test_df.shape}")
+print(f"Train columns: {list(train_df.columns)}")
+print(f"Test columns: {list(test_df.columns)}")
+print("vDILIConcern counts:")
+print(train_df["vDILIConcern"].value_counts(dropna=False).to_string())
+
+# Try RDKit Morgan fingerprints; fallback to hashed character n-grams if RDKit is unavailable.
+USE_RDKIT = False
+try:
+    from rdkit import Chem
+    from rdkit.Chem import AllChem, DataStructs
+    USE_RDKIT = True
+    print("RDKit available: using Morgan fingerprints.")
+except Exception as e:
+    print(f"RDKit unavailable ({repr(e)}): using hashed SMILES character n-gram features fallback.")
+
+def morgan_features(smiles_list, n_bits=2048, radius=2):
+    arr = np.zeros((len(smiles_list), n_bits), dtype=np.uint8)
+    invalid = []
+    for i, smi in enumerate(smiles_list):
+        if not isinstance(smi, str) or not smi.strip():
+            invalid.append((i, smi))
+            continue
+        mol = Chem.MolFromSmiles(smi)
+        if mol is None:
+            invalid.append((i, smi))
+            continue
+        fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius, nBits=n_bits)
+        DataStructs.ConvertToNumpyArray(fp, arr[i])
+    if invalid:
+        print(f"Warning: {len(invalid)} invalid/empty SMILES featurized as zero vector. First few: {invalid[:5]}")
+    return arr
+
+def hashed_smiles_features(train_smiles, test_smiles, n_features=4096):
+    vec = HashingVectorizer(
+        analyzer="char",
+        ngram_range=(2, 5),
+        n_features=n_features,
+        alternate_sign=False,
+        norm=None,
+        lowercase=False,
+    )
+    Xtr = vec.transform([s if isinstance(s, str) else "" for s in train_smiles])
+    Xte = vec.transform([s if isinstance(s, str) else "" for s in test_smiles])
+    return Xtr, Xte
+
+all_train_smiles = train_df["standardised_smiles"].astype(str).tolist()
+test_smiles = test_df["standardised_smiles"].astype(str).tolist()
+
+if USE_RDKIT:
+    X_all = morgan_features(all_train_smiles, n_bits=2048, radius=2)
+    X_test = morgan_features(test_smiles, n_bits=2048, radius=2)
+else:
+    X_all, X_test = hashed_smiles_features(all_train_smiles, test_smiles, n_features=4096)
+
+# Dataset split definitions, using the benchmark's 1-based inclusive ranges:
+# MC: 1-173 -> zero-based [0:173]
+# LC: 174-433 -> [173:433]
+# NC: 434-660 -> [433:660]
+# sider: 661-923 -> [660:923]
+n_train = len(train_df)
+split_ranges = {
+    "MC": np.arange(0, min(173, n_train)),
+    "LC": np.arange(173, min(433, n_train)),
+    "NC": np.arange(433, min(660, n_train)),
+    "sider": np.arange(660, min(923, n_train)),
+}
+
+for name, idx in split_ranges.items():
+    vals = train_df.iloc[idx]["vDILIConcern"].value_counts(dropna=False).to_dict() if len(idx) else {}
+    print(f"{name}: n={len(idx)} vDILIConcern={vals}")
+
+configs = {
+    "MCNC": {
+        "pos_idx": split_ranges["MC"],
+        "neg_idx": split_ranges["NC"],
+    },
+    "MCLCNC": {
+        "pos_idx": np.concatenate([split_ranges["MC"], split_ranges["LC"]]),
+        "neg_idx": split_ranges["NC"],
+    },
+    "all": {
+        "pos_idx": np.concatenate([split_ranges["MC"], split_ranges["LC"]]),
+        "neg_idx": np.concatenate([split_ranges["NC"], split_ranges["sider"]]),
+    },
+}
+
+param_grid = {
+    "n_estimators": [200, 500],
+    "max_depth": [None, 10, 20],
+    "min_samples_split": [2, 5],
+    "min_samples_leaf": [1, 2],
+    "max_features": ["sqrt"],
+}
+
+summary = {}
+
+for conf_name, conf in configs.items():
+    pos_idx = np.array(conf["pos_idx"], dtype=int)
+    neg_idx = np.array(conf["neg_idx"], dtype=int)
+    use_idx = np.concatenate([pos_idx, neg_idx])
+    y = np.concatenate([np.ones(len(pos_idx), dtype=int), np.zeros(len(neg_idx), dtype=int)])
+    X = X_all[use_idx]
+
+    print("\n" + "=" * 80)
+    print(f"Configuration: {conf_name}")
+    print(f"Training examples: {len(y)} | positives(DILI): {int(y.sum())} | negatives(NoDILI): {int((1-y).sum())}")
+    print(f"Feature matrix shape: {X.shape}")
+
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
+    rf = RandomForestClassifier(
+        random_state=RANDOM_STATE,
+        class_weight="balanced",
+        n_jobs=-1,
+        bootstrap=True,
+    )
+    grid = GridSearchCV(
+        estimator=rf,
+        param_grid=param_grid,
+        scoring=make_scorer(balanced_accuracy_score),
+        cv=cv,
+        n_jobs=-1,
+        refit=True,
+        verbose=0,
+        return_train_score=True,
+    )
+    grid.fit(X, y)
+
+    best_model = grid.best_estimator_
+    train_pred = best_model.predict(X)
+    train_acc = accuracy_score(y, train_pred)
+    train_bal_acc = balanced_accuracy_score(y, train_pred)
+    train_auc = None
+    try:
+        train_proba = best_model.predict_proba(X)[:, 1]
+        train_auc = roc_auc_score(y, train_proba)
+    except Exception:
+        pass
+
+    print(f"Best CV balanced accuracy: {grid.best_score_:.6f}")
+    print(f"Best params: {json.dumps(grid.best_params_, sort_keys=True)}")
+    print(f"Refit train accuracy: {train_acc:.6f}")
+    print(f"Refit train balanced accuracy: {train_bal_acc:.6f}")
+    if train_auc is not None:
+        print(f"Refit train ROC-AUC: {train_auc:.6f}")
+
+    test_pred = best_model.predict(X_test)
+    labels = np.where(test_pred == 1, "DILI", "NoDILI")
+    out_df = pd.DataFrame({
+        "standardised_smiles": test_df["standardised_smiles"].astype(str),
+        "label": labels,
+    })
+    out_path = OUT_DIR / f"{conf_name}_RF.csv"
+    out_df.to_csv(out_path, index=False)
+
+    print(f"Saved predictions: {out_path} shape={out_df.shape}")
+    print("Prediction label counts:")
+    print(out_df["label"].value_counts().to_string())
+
+    # Save top CV rows for audit.
+    cvres = pd.DataFrame(grid.cv_results_).sort_values("rank_test_score").head(10)
+    audit_path = OUT_DIR / f"{conf_name}_RF_cv_top10.csv"
+    keep_cols = ["rank_test_score", "mean_test_score", "std_test_score", "mean_train_score", "std_train_score", "params"]
+    cvres[keep_cols].to_csv(audit_path, index=False)
+    print(f"Saved CV audit: {audit_path}")
+
+    summary[conf_name] = {
+        "n_train": int(len(y)),
+        "n_pos": int(y.sum()),
+        "n_neg": int((1 - y).sum()),
+        "best_cv_balanced_accuracy": float(grid.best_score_),
+        "best_params": grid.best_params_,
+        "train_accuracy": float(train_acc),
+        "train_balanced_accuracy": float(train_bal_acc),
+        "train_roc_auc": None if train_auc is None else float(train_auc),
+        "prediction_counts": out_df["label"].value_counts().to_dict(),
+        "output": str(out_path),
+    }
+
+summary_path = OUT_DIR / "RF_training_summary.json"
+with open(summary_path, "w") as f:
+    json.dump(summary, f, indent=2)
+
+print("\n" + "=" * 80)
+print("Workflow complete.")
+print(f"Summary saved to: {summary_path}")
+print(json.dumps(summary, indent=2))
+print(f"Required file exists: {(OUT_DIR / 'MCNC_RF.csv').exists()} at {OUT_DIR / 'MCNC_RF.csv'}")
 [OBS t18 step 1 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Starting DILI Random Forest training workflow | Python: 3.10.22 | Train path exists: True | Test path exists: True | Loaded train shape: (923, 6) | Loaded test shape: (55, 1) | Train columns: ['Unnamed: 0', 'PubChem_CID', 'Compound Name', 'standardised_smiles', 'vDILIConcern', 'cluster'] | Test columns: ['standardised_smiles'] | vDILIConcern counts: | vDILIConcern | sider_inactive        262 | vLess-DILI-Concern    260 | vNo-DILI-Concern      227 | vMost-DILI-Concern    174 | RDKit available: using Morgan fingerprints. | MC: n=173 vDILIConcern={'vMost-DILI-Concern': 173} | LC: n=260 vDILIConcern={'vLess-DILI-Concern': 259, 'vMost-DILI-Concern': 1} | NC: n=227 vDILIConcern={'vNo-DILI-Concern': 226, 'vLess-DILI-Concern': 1} | sider: n=263 vDILIConcern={'sider_inactive': 262, 'vNo-DILI-Concern': 1} |  | ================================================================================ | Configuration: MCNC | Training examples: 400 | positives(DILI): 173 | negatives(NoDILI): 227 | Feature matrix shape: (400, 2048) | Best CV balanced accuracy: 0.746186 | Best params: {"max_depth": 20, "max_features": "sqrt", "min_samples_leaf": 2, "min_samples_split": 5, "n ... [TRUNCATED]
 
 ===== POINT 2/38: t18s1@1791614252-322475 =====
 [TASK-DESC] Train a Random Forest classifier to predict whether a given chemical structure (in SMILES format) poses a Drug-Induced Liver Injury (DILI) concern. The dataset's vDILIConcern column classifies 'vMost-DILI-Concern' and 'vLess-DILI-Concern' as positive, and 'vNo-DILI-Concern' and 'sider_inactive' as negative. The training dataset is split into different sets: MC (1–173), LC (174–433), NC (434–660), and sider (661–923). Use these splits to create three task configurations: MCNC (classifying MC vs NC drugs), MCLCNC (classifying MC/LC vs NC drugs), and all (classifying MC/LC vs NC/sider-inactive drugs). For each task configuration, use the training examples to perform 5-fold cross-validation and hyperparameter search. Use the model trained on the best hyperparameter and save the prediction results to "pred_results/{data_conf}_RF.csv" where data_conf is the name of different data configurations (i.e., MCNC, MCLCNC, and all). Put the chemical smiles name and predicted label (’DILI’ or ’NoDILI’)  in the ’standardised_smiles’ and ’label’ column respectively.
-[STEP-CODE t18 step 1] (10 chars)
-step_01.py
+[STEP-CODE t18 step 1] (1040 chars)
+#!/usr/bin/env python3
+import os
+import sys
+import json
+import importlib.util
+from pathlib import Path
+
+print("Working directory:", os.getcwd())
+print("Python:", sys.version)
+
+for pkg in ["pandas", "numpy", "sklearn", "rdkit"]:
+    spec = importlib.util.find_spec(pkg)
+    print(f"Package {pkg}: {'FOUND' if spec else 'MISSING'}")
+
+data_dir = Path("dili")
+print("Data dir exists:", data_dir.exists())
+for fn in ["train.csv", "test.csv"]:
+    p = data_dir / fn
+    print(f"\nFile {p}: exists={p.exists()} size={p.stat().st_size if p.exists() else 'NA'}")
+    if p.exists():
+        import pandas as pd
+        df = pd.read_csv(p)
+        print(f"{fn} shape:", df.shape)
+        print(f"{fn} columns:", list(df.columns))
+        print(df.head().to_string())
+        if "vDILIConcern" in df.columns:
+            print("vDILIConcern counts:")
+            print(df["vDILIConcern"].value_counts(dropna=False).to_string())
+        if "standardised_smiles" in df.columns:
+            print("Missing smiles:", df["standardised_smiles"].isna().sum())
 [OBS t18 step 1 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Working directory: <WORKDIR> | Python: 3.10.22 | packaged by conda-forge | (main, Oct  6 2026, 23:02:24) [GCC 14.4.0] | Package pandas: FOUND | Package numpy: FOUND | Package sklearn: FOUND | Package rdkit: FOUND | Data dir exists: True |  | File dili/train.csv: exists=True size=80524 | train.csv shape: (923, 6) | train.csv columns: ['Unnamed: 0', 'PubChem_CID', 'Compound Name', 'standardised_smiles', 'vDILIConcern', 'cluster'] |    Unnamed: 0  PubChem_CID  Compound Name                              standardised_smiles        vDILIConcern  cluster | 0           0        34869     amineptine               O=C(O)CCCCCCNC1c2ccccc2CCc2ccccc21  vMost-DILI-Concern        0 | 1           1         2717  chlormezanone                CN1C(=O)CCS(=O)(=O)C1c1ccc(Cl)cc1  vMost-DILI-Concern        1 | 2           2        65679       droxicam  CN1c2c(oc(=O)n(-c3ccccn3)c2=O)-c2ccccc2S1(=O)=O  vMost-DILI-Concern        2 | 3           3        65869     ebrotidine    NC(N)=Nc1nc(CSCCN=CNS(=O)(=O)c2ccc(Br)cc2)cs1  vMost-DILI-Concern        3 | 4           4         4495     nimesulide       CS(=O)(=O)Nc1ccc([N+](=O)[O-])cc1Oc1ccccc1  vMost-DILI-Concern        4 | vD ... [TRUNCATED]
 
 ===== POINT 3/38: t18s2@1791614252-322475 =====
 [TASK-DESC] Train a Random Forest classifier to predict whether a given chemical structure (in SMILES format) poses a Drug-Induced Liver Injury (DILI) concern. The dataset's vDILIConcern column classifies 'vMost-DILI-Concern' and 'vLess-DILI-Concern' as positive, and 'vNo-DILI-Concern' and 'sider_inactive' as negative. The training dataset is split into different sets: MC (1–173), LC (174–433), NC (434–660), and sider (661–923). Use these splits to create three task configurations: MCNC (classifying MC vs NC drugs), MCLCNC (classifying MC/LC vs NC drugs), and all (classifying MC/LC vs NC/sider-inactive drugs). For each task configuration, use the training examples to perform 5-fold cross-validation and hyperparameter search. Use the model trained on the best hyperparameter and save the prediction results to "pred_results/{data_conf}_RF.csv" where data_conf is the name of different data configurations (i.e., MCNC, MCLCNC, and all). Put the chemical smiles name and predicted label (’DILI’ or ’NoDILI’)  in the ’standardised_smiles’ and ’label’ column respectively.
-[STEP-CODE t18 step 2] (10 chars)
-step_02.py
+[STEP-CODE t18 step 2] (1570 chars)
+#!/usr/bin/env python3
+from pathlib import Path
+import pandas as pd
+
+train = pd.read_csv("dili/train.csv")
+print("Train shape", train.shape)
+
+# Inspect label transitions and the benchmark's stated split boundaries.
+print("\nRows around stated 1-based boundaries:")
+for start, end in [(165,180), (425,440), (652,668)]:
+    print(f"\n0-based rows {start}:{end}")
+    cols = ["Unnamed: 0", "Compound Name", "vDILIConcern"]
+    print(train.loc[start:end, cols].to_string(index=True))
+
+print("\nCounts in likely 0-based contiguous concern blocks (by label run):")
+# identify runs
+runs = []
+current = None
+run_start = 0
+for i, val in enumerate(train["vDILIConcern"]):
+    if i == 0:
+        current = val
+    elif val != current:
+        runs.append((run_start, i-1, current, i-run_start))
+        run_start = i
+        current = val
+runs.append((run_start, len(train)-1, current, len(train)-run_start))
+for r in runs:
+    print(r)
+
+print("\nCounts by stated 1-based splits converted to 0-based inclusive:")
+splits = {
+    "MC_1_173": (0,172),
+    "LC_174_433": (173,432),
+    "NC_434_660": (433,659),
+    "sider_661_923": (660,922),
+}
+for name, (a,b) in splits.items():
+    vc = train.iloc[a:b+1]["vDILIConcern"].value_counts()
+    print(name, a, b, b-a+1)
+    print(vc.to_string())
+
+print("\nCounts by natural label runs:")
+for name, lab in [("MC", "vMost-DILI-Concern"), ("LC", "vLess-DILI-Concern"), ("NC", "vNo-DILI-Concern"), ("sider", "sider_inactive")]:
+    idx = train.index[train["vDILIConcern"] == lab]
+    print(name, lab, len(idx), int(idx.min()), int(idx.max()))
 [OBS t18 step 2 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Train shape (923, 6) |  | Rows around stated 1-based boundaries: |  | 0-based rows 165:180 |      Unnamed: 0   Compound Name        vDILIConcern | 165         165     terbinafine  vMost-DILI-Concern | 166         166    testosterone  vMost-DILI-Concern | 167         167   thiabendazole  vMost-DILI-Concern | 168         168     ticlopidine  vMost-DILI-Concern | 169         169      tizanidine  vMost-DILI-Concern | 170         170       tolvaptan  vMost-DILI-Concern | 171         171    voriconazole  vMost-DILI-Concern | 172         172     zafirlukast  vMost-DILI-Concern | 173         173        zileuton  vMost-DILI-Concern | 174         174        adefovir  vLess-DILI-Concern | 175         175  amphotericin b  vLess-DILI-Concern | 176         176      ampicillin  vLess-DILI-Concern | 177         177      atazanavir  vLess-DILI-Concern | 178         178   bromocriptine  vLess-DILI-Concern | 179         179   carbenicillin  vLess-DILI-Concern | 180         180     carboplatin  vLess-DILI-Concern |  | 0-based rows 425:440 |      Unnamed: 0            Compound Name        vDILIConcern | 425         425                metformin  vLess-DILI-Concern | 426   ... [TRUNCATED]
 
 ===== POINT 4/38: t18s3@1791614252-322475 =====
 [TASK-DESC] Train a Random Forest classifier to predict whether a given chemical structure (in SMILES format) poses a Drug-Induced Liver Injury (DILI) concern. The dataset's vDILIConcern column classifies 'vMost-DILI-Concern' and 'vLess-DILI-Concern' as positive, and 'vNo-DILI-Concern' and 'sider_inactive' as negative. The training dataset is split into different sets: MC (1–173), LC (174–433), NC (434–660), and sider (661–923). Use these splits to create three task configurations: MCNC (classifying MC vs NC drugs), MCLCNC (classifying MC/LC vs NC drugs), and all (classifying MC/LC vs NC/sider-inactive drugs). For each task configuration, use the training examples to perform 5-fold cross-validation and hyperparameter search. Use the model trained on the best hyperparameter and save the prediction results to "pred_results/{data_conf}_RF.csv" where data_conf is the name of different data configurations (i.e., MCNC, MCLCNC, and all). Put the chemical smiles name and predicted label (’DILI’ or ’NoDILI’)  in the ’standardised_smiles’ and ’label’ column respectively.
-[STEP-CODE t18 step 3] (10 chars)
-step_03.py
+[STEP-CODE t18 step 3] (5608 chars)
+#!/usr/bin/env python3
+import os
+import warnings
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+from rdkit import Chem, RDLogger
+from rdkit.Chem import AllChem, DataStructs
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import GridSearchCV, StratifiedKFold
+from sklearn.metrics import balanced_accuracy_score, accuracy_score, f1_score, roc_auc_score, make_scorer
+
+RDLogger.DisableLog("rdApp.*")
+warnings.filterwarnings("ignore")
+
+RANDOM_STATE = 42
+FP_BITS = 2048
+FP_RADIUS = 2
+
+out_dir = Path("pred_results")
+out_dir.mkdir(exist_ok=True)
+
+train_path = Path("dili/train.csv")
+test_path = Path("dili/test.csv")
+train = pd.read_csv(train_path)
+test = pd.read_csv(test_path)
+
+print("Loaded train:", train.shape, "test:", test.shape)
+print("Train label counts:")
+print(train["vDILIConcern"].value_counts().to_string())
+
+def smiles_to_morgan_array(smiles_list, n_bits=FP_BITS, radius=FP_RADIUS):
+    X = np.zeros((len(smiles_list), n_bits), dtype=np.uint8)
+    bad = []
+    for i, smi in enumerate(smiles_list):
+        mol = Chem.MolFromSmiles(str(smi))
+        if mol is None:
+            bad.append((i, smi))
+            continue
+        fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius, nBits=n_bits)
+        DataStructs.ConvertToNumpyArray(fp, X[i])
+    return X, bad
+
+# Featurize all unique needed rows once.
+X_train_all, bad_train = smiles_to_morgan_array(train["standardised_smiles"].tolist())
+X_test, bad_test = smiles_to_morgan_array(test["standardised_smiles"].tolist())
+print(f"Fingerprints: train {X_train_all.shape}, test {X_test.shape}")
+print(f"Invalid train SMILES: {len(bad_train)}; invalid test SMILES: {len(bad_test)}")
+if bad_train[:5]:
+    print("First invalid train examples:", bad_train[:5])
+if bad_test[:5]:
+    print("First invalid test examples:", bad_test[:5])
+
+# Use the actual contiguous label-defined blocks in this provided file.
+# They correspond to MC=vMost, LC=vLess, NC=vNo, sider=sider_inactive.
+label_sets = {
+    "MCNC": {
+        "positive": ["vMost-DILI-Concern"],
+        "negative": ["vNo-DILI-Concern"],
+    },
+    "MCLCNC": {
+        "positive": ["vMost-DILI-Concern", "vLess-DILI-Concern"],
+        "negative": ["vNo-DILI-Concern"],
+    },
+    "all": {
+        "positive": ["vMost-DILI-Concern", "vLess-DILI-Concern"],
+        "negative": ["vNo-DILI-Concern", "sider_inactive"],
+    },
+}
+
+param_grid = {
+    "n_estimators": [200, 500],
+    "max_depth": [None, 10, 20],
+    "min_samples_split": [2, 5],
+    "min_samples_leaf": [1, 2],
+    "max_features": ["sqrt"],
+}
+
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
+scoring = {
+    "balanced_accuracy": make_scorer(balanced_accuracy_score),
+    "f1": make_scorer(f1_score),
+    "accuracy": make_scorer(accuracy_score),
+    "roc_auc": "roc_auc",
+}
+
+summary_rows = []
+
+for conf_name, cfg in label_sets.items():
+    pos = set(cfg["positive"])
+    neg = set(cfg["negative"])
+    mask = train["vDILIConcern"].isin(pos | neg).to_numpy()
+    idx = np.where(mask)[0]
+    y = train.loc[mask, "vDILIConcern"].apply(lambda x: 1 if x in pos else 0).to_numpy()
+    X = X_train_all[mask]
+
+    print("\n" + "=" * 80)
+    print(f"Configuration: {conf_name}")
+    print("Training rows:", len(idx), "Positive(DILI):", int(y.sum()), "Negative(NoDILI):", int((1-y).sum()))
+    print("Included labels:")
+    print(train.loc[mask, "vDILIConcern"].value_counts().to_string())
+
+    rf = RandomForestClassifier(
+        random_state=RANDOM_STATE,
+        class_weight="balanced",
+        n_jobs=-1,
+    )
+    gs = GridSearchCV(
+        estimator=rf,
+        param_grid=param_grid,
+        scoring=scoring,
+        refit="balanced_accuracy",
+        cv=cv,
+        n_jobs=-1,
+        verbose=0,
+        return_train_score=False,
+    )
+    gs.fit(X, y)
+
+    best = gs.best_estimator_
+    print("Best params:", gs.best_params_)
+    print("Best CV balanced_accuracy:", gs.best_score_)
+
+    cvres = pd.DataFrame(gs.cv_results_)
+    show_cols = [
+        "rank_test_balanced_accuracy",
+        "mean_test_balanced_accuracy",
+        "std_test_balanced_accuracy",
+        "mean_test_f1",
+        "mean_test_accuracy",
+        "mean_test_roc_auc",
+        "param_n_estimators",
+        "param_max_depth",
+        "param_min_samples_split",
+        "param_min_samples_leaf",
+    ]
+    print("Top 5 CV rows:")
+    print(cvres.sort_values("rank_test_balanced_accuracy")[show_cols].head(5).to_string(index=False))
+
+    pred = best.predict(X_test)
+    pred_labels = np.where(pred == 1, "DILI", "NoDILI")
+    out = pd.DataFrame({
+        "standardised_smiles": test["standardised_smiles"],
+        "label": pred_labels,
+    })
+    out_path = out_dir / f"{conf_name}_RF.csv"
+    out.to_csv(out_path, index=False)
+    print(f"Saved {out_path} with shape {out.shape}")
+    print("Prediction label counts:")
+    print(out["label"].value_counts().to_string())
+
+    summary_rows.append({
+        "config": conf_name,
+        "n_train": len(y),
+        "n_pos": int(y.sum()),
+        "n_neg": int((1-y).sum()),
+        "best_cv_balanced_accuracy": float(gs.best_score_),
+        **{f"best_{k}": v for k, v in gs.best_params_.items()},
+        "out_path": str(out_path),
+        "pred_DILI": int((pred == 1).sum()),
+        "pred_NoDILI": int((pred == 0).sum()),
+    })
+
+summary = pd.DataFrame(summary_rows)
+summary_path = out_dir / "RF_summary.csv"
+summary.to_csv(summary_path, index=False)
+print("\n" + "=" * 80)
+print("Summary:")
+print(summary.to_string(index=False))
+print("Saved summary:", summary_path)
+print("Required file exists:", Path("pred_results/MCNC_RF.csv").exists())
 [OBS t18 step 3 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Loaded train: (923, 6) test: (55, 1) | Train label counts: | vDILIConcern | sider_inactive        262 | vLess-DILI-Concern    260 | vNo-DILI-Concern      227 | vMost-DILI-Concern    174 | Fingerprints: train (923, 2048), test (55, 2048) | Invalid train SMILES: 0; invalid test SMILES: 0 |  | ================================================================================ | Configuration: MCNC | Training rows: 401 Positive(DILI): 174 Negative(NoDILI): 227 | Included labels: | vDILIConcern | vNo-DILI-Concern      227 | vMost-DILI-Concern    174 | Best params: {'max_depth': 20, 'max_features': 'sqrt', 'min_samples_leaf': 2, 'min_samples_split': 2, 'n_estimators': 500} | Best CV balanced_accuracy: 0.7491953883002477 | Top 5 CV rows: |  rank_test_balanced_accuracy  mean_test_balanced_accuracy  std_test_balanced_accuracy  mean_test_f1  mean_test_accuracy  mean_test_roc_auc  param_n_estimators param_max_depth  param_min_samples_split  param_min_samples_leaf |                            1                     0.749195                    0.040808      0.714798            0.753025           0.831381                 500              20                        2    ... [TRUNCATED]
 
 ===== POINT 5/38: t34s1@1791612856-279147 =====
 [TASK-DESC] Use the data in "bio_resting_5min_100hz.csv" to compute heart rate variability (HRV) indices in the time-, frequency-, and non-linear domain. Find the peaks of ECG signal and extract features from three domains (i.e., time-domain, frequency-domain and non-linear domain). Save the extracted features from these three domains to 'pred_results/hrv_analysis_pred.csv'.
-[STEP-CODE t34 step 1] (10 chars)
-step_01.py
+[STEP-CODE t34 step 1] (14931 chars)
+#!/usr/bin/env python3
+"""
+Compute HRV features from biosignals/bio_resting_5min_100hz.csv and save to
+pred_results/hrv_analysis_pred.csv.
+
+The script prefers NeuroKit2 if available, and otherwise uses a scipy/numpy
+implementation for ECG cleaning, R-peak detection, and HRV time/frequency/
+nonlinear features.
+"""
+import os
+import math
+import warnings
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+warnings.filterwarnings("ignore")
+
+DATA_PATH = Path("biosignals/bio_resting_5min_100hz.csv")
+OUT_DIR = Path("pred_results")
+OUT_PATH = OUT_DIR / "hrv_analysis_pred.csv"
+FS = 100.0
+
+
+def _as_scalar(x):
+    try:
+        if hasattr(x, "iloc"):
+            return x.iloc[0]
+        if isinstance(x, (list, tuple, np.ndarray)):
+            return x[0]
+        return x
+    except Exception:
+        return x
+
+
+def _sanitize_features(d):
+    out = {}
+    for k, v in d.items():
+        val = _as_scalar(v)
+        try:
+            val = float(val)
+            if not np.isfinite(val):
+                val = np.nan
+        except Exception:
+            continue
+        out[str(k)] = val
+    return out
+
+
+def try_neurokit(ecg, fs):
+    """Return feature dictionary and R-peak samples using NeuroKit2, or (None, None)."""
+    try:
+        import neurokit2 as nk
+    except Exception as exc:
+        print(f"NeuroKit2 not available, using fallback implementation. Import error: {exc}")
+        return None, None
+
+    try:
+        ecg_cleaned = nk.ecg_clean(ecg, sampling_rate=int(fs), method="neurokit")
+        signals, info = nk.ecg_peaks(ecg_cleaned, sampling_rate=int(fs), method="neurokit", correct_artifacts=True)
+        peaks = np.asarray(info.get("ECG_R_Peaks", []), dtype=int)
+        if len(peaks) < 5:
+            raise RuntimeError(f"NeuroKit2 detected too few peaks: {len(peaks)}")
+
+        time_df = nk.hrv_time(peaks, sampling_rate=int(fs), show=False)
+        freq_df = nk.hrv_frequency(peaks, sampling_rate=int(fs), show=False, normalize=False)
+        nonlin_df = nk.hrv_nonlinear(peaks, sampling_rate=int(fs), show=False)
+
+        features = {}
+        features.update(_sanitize_features(time_df.iloc[0].to_dict()))
+        features.update(_sanitize_features(freq_df.iloc[0].to_dict()))
+        features.update(_sanitize_features(nonlin_df.iloc[0].to_dict()))
+
+        # Add explicit simple provenance/count features.
+        features["RPeak_Count"] = float(len(peaks))
+        features["Recording_Duration_s"] = float(len(ecg) / fs)
+        features["Mean_HR_bpm_from_peaks"] = float(60.0 / np.mean(np.diff(peaks) / fs))
+
+        print("Used NeuroKit2 implementation.")
+        return features, peaks
+    except Exception as exc:
+        print(f"NeuroKit2 failed, using fallback implementation. Error: {exc}")
+        return None, None
+
+
+def bandpass_filter(x, fs, low=0.5, high=40.0, order=3):
+    from scipy import signal
+
+    nyq = fs / 2.0
+    high = min(high, nyq * 0.95)
+    sos = signal.butter(order, [low / nyq, high / nyq], btype="bandpass", output="sos")
+    return signal.sosfiltfilt(sos, x)
+
+
+def detect_rpeaks_fallback(ecg, fs):
+    from scipy import signal
+
+    x = np.asarray(ecg, dtype=float)
+    x = x - np.nanmedian(x)
+    x = np.nan_to_num(x, nan=0.0)
+
+    clean = bandpass_filter(x, fs)
+    z = (clean - np.mean(clean)) / (np.std(clean) + 1e-12)
+
+    # Main detector: positive R waves with robust prominence threshold.
+    distance = int(round(0.35 * fs))
+    prominence = max(0.25, 0.45 * np.std(z))
+    peaks_pos, props_pos = signal.find_peaks(z, distance=distance, prominence=prominence)
+
+    # If ECG is inverted or main detection is poor, test negative polarity too.
+    peaks_neg, props_neg = signal.find_peaks(-z, distance=distance, prominence=prominence)
+
+    def score(peaks):
+        if len(peaks) < 3:
+            return -np.inf
+        rr = np.diff(peaks) / fs
+        rr = rr[(rr >= 0.3) & (rr <= 2.2)]
+        if len(rr) < 2:
+            return -np.inf
+        # Prefer plausible number and regularity, penalize implausible HR.
+        hr = 60.0 / np.median(rr)
+        plaus = 1.0 if 35 <= hr <= 180 else 0.0
+        return len(rr) + 10 * plaus - 5 * (np.std(rr) / (np.mean(rr) + 1e-9))
+
+    peaks = peaks_pos if score(peaks_pos) >= score(peaks_neg) else peaks_neg
+    polarity = "positive" if peaks is peaks_pos else "negative"
+    signal_for_refine = clean if polarity == "positive" else -clean
+
+    # Refine peaks to local maxima in a small window on selected polarity.
+    refined = []
+    half = int(round(0.08 * fs))
+    for p in peaks:
+        lo = max(0, p - half)
+        hi = min(len(signal_for_refine), p + half + 1)
+        if hi > lo:
+            refined.append(lo + int(np.argmax(signal_for_refine[lo:hi])))
+    peaks = np.array(sorted(set(refined)), dtype=int)
+
+    # Remove physiologically implausible RR artifacts by comparing to local median.
+    if len(peaks) >= 5:
+        changed = True
+        while changed and len(peaks) >= 5:
+            changed = False
+            rr = np.diff(peaks) / fs
+            med = np.median(rr)
+            bad_idx = np.where((rr < 0.30) | (rr > 2.20) | (rr < 0.55 * med) | (rr > 1.80 * med))[0]
+            if len(bad_idx) > 0:
+                i = int(bad_idx[0])
+                # If two peaks too close, drop lower-amplitude one; otherwise drop peak after abnormal interval.
+                if rr[i] < 0.55 * med and i + 1 < len(peaks):
+                    drop_local = i if signal_for_refine[peaks[i]] < signal_for_refine[peaks[i + 1]] else i + 1
+                else:
+                    drop_local = i + 1
+                peaks = np.delete(peaks, drop_local)
+                changed = True
+
+    print(f"Fallback R-peak detection polarity={polarity}, peaks={len(peaks)}")
+    return peaks, clean
+
+
+def rr_intervals_ms(peaks, fs):
+    rr = np.diff(np.asarray(peaks, dtype=float)) / fs * 1000.0
+    rr = rr[np.isfinite(rr)]
+    # Conservative final interval filter.
+    rr = rr[(rr >= 300.0) & (rr <= 2200.0)]
+    return rr
+
+
+def sample_entropy(x, m=2, r=None):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    n = len(x)
+    if n <= m + 2:
+        return np.nan
+    if r is None:
+        r = 0.2 * np.std(x, ddof=0)
+    if r <= 0:
+        return np.nan
+
+    def _count(mm):
+        count = 0
+        total = 0
+        templates = np.array([x[i:i + mm] for i in range(n - mm + 1)])
+        for i in range(len(templates) - 1):
+            dist = np.max(np.abs(templates[i + 1:] - templates[i]), axis=1)
+            count += int(np.sum(dist <= r))
+            total += len(dist)
+        return count, total
+
+    b, _ = _count(m)
+    a, _ = _count(m + 1)
+    if b == 0:
+        return np.nan
+    if a == 0:
+        # finite upper estimate convention
+        return -np.log(1.0 / b)
+    return -np.log(a / b)
+
+
+def approximate_entropy(x, m=2, r=None):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    n = len(x)
+    if n <= m + 2:
+        return np.nan
+    if r is None:
+        r = 0.2 * np.std(x, ddof=0)
+    if r <= 0:
+        return np.nan
+
+    def phi(mm):
+        templates = np.array([x[i:i + mm] for i in range(n - mm + 1)])
+        c = []
+        for i in range(len(templates)):
+            dist = np.max(np.abs(templates - templates[i]), axis=1)
+            c.append(np.mean(dist <= r))
+        c = np.asarray(c)
+        c = np.maximum(c, 1e-300)
+        return np.mean(np.log(c))
+
+    return phi(m) - phi(m + 1)
+
+
+def higuchi_fd(x, kmax=10):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    n = len(x)
+    if n < kmax + 2:
+        return np.nan
+    lk = []
+    kvals = np.arange(1, kmax + 1)
+    for k in kvals:
+        lm = []
+        for m in range(k):
+            idx = np.arange(m, n, k)
+            if len(idx) < 2:
+                continue
+            length = np.sum(np.abs(np.diff(x[idx])))
+            norm = (n - 1) / (((len(idx) - 1) * k) + 1e-12)
+            lm.append(length * norm / k)
+        lk.append(np.mean(lm) if lm else np.nan)
+    lk = np.asarray(lk)
+    mask = np.isfinite(lk) & (lk > 0)
+    if np.sum(mask) < 2:
+        return np.nan
+    slope, _ = np.polyfit(np.log(1.0 / kvals[mask]), np.log(lk[mask]), 1)
+    return float(slope)
+
+
+def dfa_alpha(x):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    n = len(x)
+    if n < 16:
+        return np.nan
+    y = np.cumsum(x - np.mean(x))
+    scales = np.unique(np.floor(np.logspace(np.log10(4), np.log10(max(5, n // 4)), 10)).astype(int))
+    fluct = []
+    used = []
+    for s in scales:
+        if s < 4 or n // s < 2:
+            continue
+        rms = []
+        for start in range(0, n - s + 1, s):
+            seg = y[start:start + s]
+            t = np.arange(s)
+            coef = np.polyfit(t, seg, 1)
+            trend = np.polyval(coef, t)
+            rms.append(np.sqrt(np.mean((seg - trend) ** 2)))
+        if rms:
+            val = np.mean(rms)
+            if val > 0:
+                fluct.append(val)
+                used.append(s)
+    if len(fluct) < 2:
+        return np.nan
+    slope, _ = np.polyfit(np.log(used), np.log(fluct), 1)
+    return float(slope)
+
+
+def fallback_features(ecg, fs):
+    from scipy import signal
+
+    peaks, _ = detect_rpeaks_fallback(ecg, fs)
+    rr = rr_intervals_ms(peaks, fs)
+    if len(rr) < 4:
+        raise RuntimeError(f"Too few valid RR intervals for HRV: {len(rr)}")
+
+    diff_rr = np.diff(rr)
+    mean_nni = np.mean(rr)
+    median_nni = np.median(rr)
+    sdnn = np.std(rr, ddof=1) if len(rr) > 1 else np.nan
+    rmssd = np.sqrt(np.mean(diff_rr ** 2)) if len(diff_rr) else np.nan
+    sdsd = np.std(diff_rr, ddof=1) if len(diff_rr) > 1 else np.nan
+    nn50 = np.sum(np.abs(diff_rr) > 50.0)
+    nn20 = np.sum(np.abs(diff_rr) > 20.0)
+
+    feats = {
+        "HRV_MeanNN": mean_nni,
+        "HRV_MedianNN": median_nni,
+        "HRV_SDNN": sdnn,
+        "HRV_RMSSD": rmssd,
+        "HRV_SDSD": sdsd,
+        "HRV_CVNN": sdnn / mean_nni if mean_nni else np.nan,
+        "HRV_CVSD": rmssd / mean_nni if mean_nni else np.nan,
+        "HRV_MadNN": np.median(np.abs(rr - median_nni)),
+        "HRV
+... [TRUNCATED]
 [OBS t34 step 1 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Loaded biosignals/bio_resting_5min_100hz.csv: rows=29900, columns=['ECG', 'PPG', 'RSP'], duration=299.00s | ECG summary: mean=-0.00708476, std=0.0411407, min=-0.708476, max=0.894532 | Used NeuroKit2 implementation. | Detected R peaks: 432 | Valid RR intervals: 431 | RR mean=692.436 ms, SDNN=48.841 ms, HR=86.651 bpm | Saved 94 HRV/provenance columns to pred_results/hrv_analysis_pred.csv | Output preview: |  Recording_Duration_s  RPeak_Count  Mean_HR_bpm_from_peaks    HRV_AI  HRV_ApEn  HRV_C1a  HRV_C1d  HRV_C2a  HRV_C2d   HRV_CD  HRV_CMSEn  HRV_CSI  HRV_CSI_Modified  HRV_CVI  HRV_CVNN  HRV_CVSD   HRV_Ca   HRV_Cd  HRV_DFA_alpha1  HRV_DFA_alpha2  HRV_FuzzyEn    HRV_GI     HRV_HF  HRV_HFD  HRV_HFn  HRV_HTI  HRV_IALS  HRV_IQRNN  HRV_KFD    HRV_LF  HRV_LFHF  HRV_LFn  HRV_LZC  HRV_LnHF  HRV_MCVNN  HRV_MFDFA_alpha1_Asymmetry  HRV_MFDFA_alpha1_Delta  HRV_MFDFA_alpha1_Fluctuation  HRV_MFDFA_alpha1_Increment  HRV_MFDFA_alpha1_Max  HRV_MFDFA_alpha1_Mean  HRV_MFDFA_alpha1_Peak  HRV_MFDFA_alpha1_Width  HRV_MFDFA_alpha2_Asymmetry  HRV_MFDFA_alpha2_Delta  HRV_MFDFA_alpha2_Fluctuation  HRV_MFDFA_alpha2_Increment  HRV_MFDFA_alpha2_Max  HRV_MFDFA_alpha2_Mean  HRV_MFDFA_ ... [TRUNCATED]
 
 ===== POINT 6/38: t34s1@1791614163-321498 =====
 [TASK-DESC] Use the data in "bio_resting_5min_100hz.csv" to compute heart rate variability (HRV) indices in the time-, frequency-, and non-linear domain. Find the peaks of ECG signal and extract features from three domains (i.e., time-domain, frequency-domain and non-linear domain). Save the extracted features from these three domains to 'pred_results/hrv_analysis_pred.csv'.
-[STEP-CODE t34 step 1] (10 chars)
-step_01.py
+[STEP-CODE t34 step 1] (852 chars)
+import os
+import sys
+import importlib.util
+import pandas as pd
+
+print("Working directory:", os.getcwd())
+print("Files in biosignals:", os.listdir("biosignals") if os.path.isdir("biosignals") else "MISSING")
+
+path = "biosignals/bio_resting_5min_100hz.csv"
+df = pd.read_csv(path)
+print("Loaded:", path)
+print("Shape:", df.shape)
+print("Columns:", list(df.columns))
+print(df.head())
+print(df.describe().T)
+
+for pkg in ["neurokit2", "scipy", "numpy", "pandas"]:
+    spec = importlib.util.find_spec(pkg)
+    print(f"Package {pkg}:", "available" if spec is not None else "not available")
+    if spec is not None:
+        try:
+            mod = importlib.import_module(pkg)
+            print(f"  version: {getattr(mod, '__version__', 'unknown')}")
+        except Exception as e:
+            print(f"  import error: {e}")
+
+print("Initial inspection complete.")
 [OBS t34 step 1 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Working directory: <WORKDIR> | Files in biosignals: ['eog_100hz.csv', 'ecg_1000hz.csv', 'bio_resting_5min_100hz.csv', 'bio_eventrelated_100hz.csv'] | Loaded: biosignals/bio_resting_5min_100hz.csv | Shape: (29900, 3) | Columns: ['ECG', 'PPG', 'RSP'] |         ECG       PPG       RSP | 0  0.003766 -0.102539  0.494652 | 1 -0.017466 -0.103760  0.502483 | 2 -0.015679 -0.107422  0.511102 | 3 -0.001598 -0.110855  0.518791 | 4  0.002483 -0.112610  0.528669 |        count      mean       std  ...       50%       75%       max | ECG  29900.0 -0.007085  0.041141  ... -0.008563  0.008522  0.894532 | PPG  29900.0  0.032287  0.198193  ... -0.022964  0.191956  0.627594 | RSP  29900.0  0.901219  0.225437  ...  0.933944  1.035443  1.766576 |  | [3 rows x 8 columns] | Package neurokit2: available |   version: 0.2.12 | Package scipy: available |   version: 1.13.1 | Package numpy: available |   version: 1.26.4 | Package pandas: available |   version: 2.3.3 | Initial inspection complete. |  | --- STDERR --- | Matplotlib created a temporary cache directory at /var/tmp/matplotlib-vxuurpyu because the default path (/root/.config/matplotlib) is not a writable directory; it i ... [TRUNCATED]
 
 ===== POINT 7/38: t34s2@1791614163-321498 =====
 [TASK-DESC] Use the data in "bio_resting_5min_100hz.csv" to compute heart rate variability (HRV) indices in the time-, frequency-, and non-linear domain. Find the peaks of ECG signal and extract features from three domains (i.e., time-domain, frequency-domain and non-linear domain). Save the extracted features from these three domains to 'pred_results/hrv_analysis_pred.csv'.
-[STEP-CODE t34 step 2] (10 chars)
-step_02.py
+[STEP-CODE t34 step 2] (2572 chars)
+import os
+import warnings
+import numpy as np
+import pandas as pd
+import neurokit2 as nk
+
+warnings.filterwarnings("ignore")
+os.makedirs("pred_results", exist_ok=True)
+
+input_path = "biosignals/bio_resting_5min_100hz.csv"
+output_path = "pred_results/hrv_analysis_pred.csv"
+sampling_rate = 100
+
+df = pd.read_csv(input_path)
+ecg = df["ECG"].astype(float).to_numpy()
+
+print("Loaded ECG samples:", len(ecg), "duration_s:", len(ecg) / sampling_rate)
+
+# Clean ECG and detect R-peaks using NeuroKit2.
+ecg_cleaned = nk.ecg_clean(ecg, sampling_rate=sampling_rate, method="neurokit")
+signals, info = nk.ecg_peaks(ecg_cleaned, sampling_rate=sampling_rate, method="neurokit", correct_artifacts=True)
+rpeaks = np.asarray(info["ECG_R_Peaks"], dtype=int)
+
+print("Detected R-peaks:", len(rpeaks))
+print("First 10 R-peaks samples:", rpeaks[:10].tolist())
+rr_ms = np.diff(rpeaks) / sampling_rate * 1000
+print("RR interval ms summary:")
+print(pd.Series(rr_ms).describe())
+
+# Compute HRV indices from three domains.
+hrv_time = nk.hrv_time(rpeaks, sampling_rate=sampling_rate, show=False)
+hrv_freq = nk.hrv_frequency(rpeaks, sampling_rate=sampling_rate, show=False, normalize=True)
+hrv_nonlinear = nk.hrv_nonlinear(rpeaks, sampling_rate=sampling_rate, show=False)
+
+print("Time-domain feature shape:", hrv_time.shape)
+print("Frequency-domain feature shape:", hrv_freq.shape)
+print("Nonlinear-domain feature shape:", hrv_nonlinear.shape)
+
+# Add explicit prefixes only if needed? NeuroKit columns already start HRV_.
+# Concatenate into one-row feature table.
+features = pd.concat(
+    [
+        hrv_time.reset_index(drop=True),
+        hrv_freq.reset_index(drop=True),
+        hrv_nonlinear.reset_index(drop=True),
+    ],
+    axis=1,
+)
+
+# Remove duplicate columns if any, preserving first occurrence.
+features = features.loc[:, ~features.columns.duplicated()].copy()
+
+# Include useful peak-count metadata while keeping HRV extracted features as main output.
+features.insert(0, "ECG_R_Peaks_N", len(rpeaks))
+features.insert(1, "ECG_R_Peaks_Rate_per_min", len(rpeaks) / (len(ecg) / sampling_rate / 60))
+
+# Convert object/bool to numeric-friendly values where possible.
+for col in features.columns:
+    if features[col].dtype == bool:
+        features[col] = features[col].astype(int)
+
+features.to_csv(output_path, index=False)
+
+print("Saved:", output_path)
+print("Output shape:", features.shape)
+print("Columns:")
+print(list(features.columns))
+print("Feature values preview:")
+with pd.option_context("display.max_columns", 200, "display.width", 240):
+    print(features.head().to_string(index=False))
 [OBS t34 step 2 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Loaded ECG samples: 29900 duration_s: 299.0 | Detected R-peaks: 432 | First 10 R-peaks samples: [49, 107, 167, 226, 285, 346, 407, 469, 538, 612] | RR interval ms summary: | count    431.000000 | mean     692.436195 | std       48.841033 | min      520.000000 | 25%      660.000000 | 50%      690.000000 | 75%      720.000000 | max      860.000000 | dtype: float64 | Time-domain feature shape: (1, 25) | Frequency-domain feature shape: (1, 10) | Nonlinear-domain feature shape: (1, 56) | Saved: pred_results/hrv_analysis_pred.csv | Output shape: (1, 93) | Columns: | ['ECG_R_Peaks_N', 'ECG_R_Peaks_Rate_per_min', 'HRV_MeanNN', 'HRV_SDNN', 'HRV_SDANN1', 'HRV_SDNNI1', 'HRV_SDANN2', 'HRV_SDNNI2', 'HRV_SDANN5', 'HRV_SDNNI5', 'HRV_RMSSD', 'HRV_SDSD', 'HRV_CVNN', 'HRV_CVSD', 'HRV_MedianNN', 'HRV_MadNN', 'HRV_MCVNN', 'HRV_IQRNN', 'HRV_SDRMSSD', 'HRV_Prc20NN', 'HRV_Prc80NN', 'HRV_pNN50', 'HRV_pNN20', 'HRV_MinNN', 'HRV_MaxNN', 'HRV_HTI', 'HRV_TINN', 'HRV_ULF', 'HRV_VLF', 'HRV_LF', 'HRV_HF', 'HRV_VHF', 'HRV_TP', 'HRV_LFHF', 'HRV_LFn', 'HRV_HFn', 'HRV_LnHF', 'HRV_SD1', 'HRV_SD2', 'HRV_SD1SD2', 'HRV_S', 'HRV_CSI', 'HRV_CVI', 'HRV_CSI_Modified', 'HRV_PIP', 'HRV_IALS', 'H ... [TRUNCATED]
 
 ===== POINT 8/38: t35s1@1791612654-276937 =====
 [TASK-DESC] Perform RRV analysis on the given data in "bio_eventrelated_100hz.csv". Clean the RSP signal and extract the inhalation peaks of the signal and the respiratory rate signal. Then use these features to analyze RRV, getting a variety of RRV indices including time domain, frequency domain, and nonlinear features. Save the results to 'pred_results/rrv_analysis_pred.csv'.
-[STEP-CODE t35 step 1] (10 chars)
-step_01.py
+[STEP-CODE t35 step 1] (16028 chars)
+#!/usr/bin/env python3
+import os
+import warnings
+import numpy as np
+import pandas as pd
+
+warnings.filterwarnings("ignore")
+
+from scipy import signal, interpolate, stats
+
+
+def read_rsp(path):
+    df = pd.read_csv(path)
+    df.columns = [c.strip() for c in df.columns]
+    if "RSP" not in df.columns:
+        raise ValueError(f"RSP column not found. Columns: {df.columns.tolist()}")
+    rsp = pd.to_numeric(df["RSP"], errors="coerce").to_numpy(dtype=float)
+    # Fill missing values by linear interpolation.
+    if np.any(~np.isfinite(rsp)):
+        s = pd.Series(rsp)
+        rsp = s.interpolate(limit_direction="both").to_numpy(dtype=float)
+    return rsp, df
+
+
+def robust_bandpass(x, fs, low=0.05, high=1.0, order=4):
+    """Clean respiration with a physiologically plausible bandpass."""
+    x = np.asarray(x, dtype=float)
+    x = x - np.nanmedian(x)
+    nyq = fs / 2.0
+    low = max(low, 0.001)
+    high = min(high, nyq * 0.95)
+    b, a = signal.butter(order, [low / nyq, high / nyq], btype="bandpass")
+    # padlen guard for short signals
+    if len(x) > max(len(a), len(b)) * 6:
+        y = signal.filtfilt(b, a, x)
+    else:
+        y = signal.lfilter(b, a, x)
+    return y
+
+
+def detect_inhalation_peaks(cleaned_rsp, fs):
+    """Detect inhalation peaks in the cleaned RSP waveform."""
+    x = np.asarray(cleaned_rsp, dtype=float)
+    # Smooth slightly to prevent high-frequency peak fragmentation.
+    win = int(round(0.25 * fs))
+    if win % 2 == 0:
+        win += 1
+    if win >= 5 and len(x) > win:
+        xs = signal.savgol_filter(x, window_length=win, polyorder=3)
+    else:
+        xs = x.copy()
+
+    # Estimate robust amplitude scale.
+    mad = np.median(np.abs(xs - np.median(xs)))
+    robust_sd = 1.4826 * mad if mad > 0 else np.std(xs)
+    prom = max(0.15 * robust_sd, 0.03 * (np.percentile(xs, 95) - np.percentile(xs, 5)))
+
+    # Respiratory peaks: normally no closer than ~1.2 s (50 breaths/min).
+    distance = int(round(1.2 * fs))
+    peaks, props = signal.find_peaks(xs, distance=distance, prominence=prom)
+
+    # If too few peaks, relax prominence.
+    if len(peaks) < 5:
+        peaks, props = signal.find_peaks(xs, distance=distance, prominence=max(prom * 0.33, 1e-12))
+
+    # Keep peaks that imply plausible neighbouring breath intervals where possible.
+    if len(peaks) >= 3:
+        t = peaks / fs
+        intervals = np.diff(t)
+        plausible = (intervals >= 1.0) & (intervals <= 12.0)
+        keep = np.ones(len(peaks), dtype=bool)
+        # A peak is retained if either interval adjacent to it is plausible.
+        for i in range(len(peaks)):
+            left = plausible[i - 1] if i - 1 >= 0 and i - 1 < len(plausible) else False
+            right = plausible[i] if i < len(plausible) else False
+            keep[i] = left or right
+        if keep.sum() >= 5:
+            peaks = peaks[keep]
+
+    return peaks, xs
+
+
+def interp_rate_signal(peak_times, duration, fs):
+    """Create a continuous respiratory-rate signal from inhalation peak intervals."""
+    if len(peak_times) < 2:
+        t_grid = np.arange(0, duration, 1 / fs)
+        return t_grid, np.full_like(t_grid, np.nan, dtype=float), np.array([]), np.array([])
+
+    intervals = np.diff(peak_times)
+    rate_bpm = 60.0 / intervals
+    # Rate estimate belongs between adjacent inhalation peaks.
+    rate_times = peak_times[:-1] + intervals / 2.0
+
+    valid = np.isfinite(rate_bpm) & (rate_bpm >= 3) & (rate_bpm <= 60)
+    rate_times = rate_times[valid]
+    rate_bpm = rate_bpm[valid]
+
+    t_grid = np.arange(0, duration, 1 / fs)
+    if len(rate_times) >= 2:
+        f = interpolate.interp1d(
+            rate_times,
+            rate_bpm,
+            kind="linear",
+            bounds_error=False,
+            fill_value=(rate_bpm[0], rate_bpm[-1]),
+        )
+        rr_signal = f(t_grid)
+    elif len(rate_times) == 1:
+        rr_signal = np.full_like(t_grid, rate_bpm[0], dtype=float)
+    else:
+        rr_signal = np.full_like(t_grid, np.nan, dtype=float)
+
+    return t_grid, rr_signal, rate_times, rate_bpm
+
+
+def safe_mean(x):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    return float(np.mean(x)) if len(x) else np.nan
+
+
+def safe_std(x, ddof=1):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    return float(np.std(x, ddof=ddof)) if len(x) > ddof else np.nan
+
+
+def sample_entropy(x, m=2, r=None):
+    """Simple SampEn implementation for short one-dimensional RRV series."""
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    n = len(x)
+    if n <= m + 2:
+        return np.nan
+    if r is None:
+        sd = np.std(x, ddof=0)
+        if sd == 0:
+            return np.nan
+        r = 0.2 * sd
+
+    def _count(mm):
+        count = 0
+        total = 0
+        for i in range(n - mm):
+            template = x[i : i + mm]
+            for j in range(i + 1, n - mm + 1):
+                total += 1
+                if np.max(np.abs(template - x[j : j + mm])) <= r:
+                    count += 1
+        return count, total
+
+    b, _ = _count(m)
+    a, _ = _count(m + 1)
+    if b == 0 or a == 0:
+        return np.nan
+    return float(-np.log(a / b))
+
+
+def approximate_entropy(x, m=2, r=None):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    n = len(x)
+    if n <= m + 2:
+        return np.nan
+    if r is None:
+        sd = np.std(x, ddof=0)
+        if sd == 0:
+            return np.nan
+        r = 0.2 * sd
+
+    def _phi(mm):
+        patterns = np.array([x[i : i + mm] for i in range(n - mm + 1)])
+        c = []
+        for p in patterns:
+            dist = np.max(np.abs(patterns - p), axis=1)
+            c.append(np.mean(dist <= r))
+        c = np.array(c)
+        c = c[c > 0]
+        if len(c) == 0:
+            return np.nan
+        return np.mean(np.log(c))
+
+    phi_m = _phi(m)
+    phi_m1 = _phi(m + 1)
+    if not np.isfinite(phi_m) or not np.isfinite(phi_m1):
+        return np.nan
+    return float(phi_m - phi_m1)
+
+
+def dfa_alpha(x):
+    """Detrended fluctuation analysis alpha over feasible scales."""
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    n = len(x)
+    if n < 16:
+        return np.nan
+    y = np.cumsum(x - np.mean(x))
+    scales = np.unique(np.floor(np.logspace(np.log10(4), np.log10(max(5, n // 4)), 8)).astype(int))
+    flucts = []
+    used_scales = []
+    for s in scales:
+        if s < 4 or n // s < 2:
+            continue
+        rms = []
+        for start in range(0, n - s + 1, s):
+            seg = y[start : start + s]
+            t = np.arange(s)
+            coef = np.polyfit(t, seg, 1)
+            trend = np.polyval(coef, t)
+            rms.append(np.sqrt(np.mean((seg - trend) ** 2)))
+        if len(rms) and np.mean(rms) > 0:
+            flucts.append(np.mean(rms))
+            used_scales.append(s)
+    if len(flucts) < 2:
+        return np.nan
+    slope, _, _, _, _ = stats.linregress(np.log(used_scales), np.log(flucts))
+    return float(slope)
+
+
+def frequency_features(rate_times, rate_bpm):
+    """Welch PSD features from evenly sampled breath-to-breath respiratory-rate series."""
+    out = {
+        "rrv_vlf_power": np.nan,
+        "rrv_lf_power": np.nan,
+        "rrv_hf_power": np.nan,
+        "rrv_total_power": np.nan,
+        "rrv_lf_hf_ratio": np.nan,
+        "rrv_lf_norm": np.nan,
+        "rrv_hf_norm": np.nan,
+        "rrv_peak_frequency_hz": np.nan,
+        "rrv_peak_frequency_bpm": np.nan,
+        "rrv_spectral_entropy": np.nan,
+    }
+    rate_times = np.asarray(rate_times, dtype=float)
+    rate_bpm = np.asarray(rate_bpm, dtype=float)
+    ok = np.isfinite(rate_times) & np.isfinite(rate_bpm)
+    rate_times = rate_times[ok]
+    rate_bpm = rate_bpm[ok]
+    if len(rate_bpm) < 4 or np.ptp(rate_times) <= 0:
+        return out
+
+    # Interpolate breath-to-breath rate at 2 Hz, adequate for variability bands up to 0.4 Hz.
+    fs_i = 2.0
+    t_even = np.arange(rate_times[0], rate_times[-1], 1 / fs_i)
+    if len(t_even) < 8:
+        return out
+    f_interp = interpolate.interp1d(rate_times, rate_bpm, kind="linear", fill_value="extrapolate")
+    y = f_interp(t_even)
+    y = signal.detrend(y)
+
+    nperseg = min(256, len(y))
+    if nperseg < 8:
+        return out
+    freqs, psd = signal.welch(y, fs=fs_i, nperseg=nperseg, noverlap=nperseg // 2)
+    if len(freqs) < 2:
+        return out
+
+    def band_power(lo, hi):
+        idx = (freqs >= lo) & (freqs < hi)
+        if idx.sum() < 1:
+            return 0.0
+        return float(np.trapz(psd[idx], freqs[idx]))
+
+    vlf = band_power(0.0033, 0.04)
+    lf = band_power(0.04, 0.15)
+    hf = band_power(0.15, 0.40)
+    total = band_power(0.0033, 0.40)
+    idx_total = (freqs >= 0.0033) & (freqs <= 0.40)
+    if idx_total.any():
+        peak_f = float(freqs[idx_total][np.argmax(psd[idx_total])])
+        p = psd[idx_total].astype(float)
+        psum = p.sum()
+        sent = float(-(p / psum * np.log2((p / psum) + 1e-12)).sum() / np.log2(len(p))) if psum > 0 and len(p) > 1 else np.nan
+    else:
+        peak_f, sent = np.nan, np.nan
+
+    out.update({
+        "rrv_vlf_power": vlf,
+        "rrv_lf_power": lf,
+        "rrv_hf_power": hf,
+        "rrv_total_power": total,
+        "rrv_lf_hf_ratio": float(lf / hf) if hf > 0 else np.nan,
+        "rrv_lf_norm": float(lf / (lf + hf)) if (lf + hf) > 0 else np.nan,
+        "rrv_hf_norm": float(hf / (lf + hf)) if (lf + hf) > 0 else np.nan,
+        "rrv_peak_frequency_hz": peak_f,
+        "rrv_peak_frequency_bpm": float(peak_f * 60) if np.isfinite(peak_f) else np.nan,
+        "rrv_spectral_entropy": sent,
+    })
+    return out
+
+
+def compute_rrv(path="biosignals/bio_eventrelated_100hz.csv", fs=100.0):
+    rsp, df = read_rsp(path)
+    duration = len(rsp) / fs
+    cleaned = robust_bandpass(rsp, fs)
+    peaks, smoothed = detect_inhalation_peaks(cleaned, fs)
+    peak_times = peaks / fs
+
+    t_grid, rr_signal, rate_times, rate_bpm = interp_rate_signal(peak_times, duration, fs)
+
+    # Extract peaks of the respiratory-rate signal.
+    if np.isfinite(rr_signal).sum() > int(fs * 5):
+        rr_for_peaks = rr_signal.copy()
+        rr_for_peaks[~np.isfinite(r
+... [TRUNCATED]
 [OBS t35 step 1 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Saved RRV analysis to: pred_results/rrv_analysis_pred.csv | Shape: (1, 53) | Key extracted values: |  duration_seconds  rsp_inhalation_peak_count  respiratory_rate_peak_count  rrv_breath_interval_count  rrv_mean_rate_bpm  rrv_sd_rate_bpm  rrv_rmssd_s  rrv_lf_power  rrv_hf_power  rrv_sample_entropy |             149.0                          0                            0                          0                NaN              NaN          NaN           NaN           NaN                 NaN | All columns: | sampling_rate_hz, duration_seconds, rsp_samples, rsp_inhalation_peak_count, rsp_first_inhalation_peak_time_s, rsp_last_inhalation_peak_time_s, rsp_cleaned_mean, rsp_cleaned_sd, rsp_cleaned_peak_mean_amplitude, rsp_cleaned_peak_sd_amplitude, respiratory_rate_signal_mean_bpm, respiratory_rate_signal_sd_bpm, respiratory_rate_signal_min_bpm, respiratory_rate_signal_max_bpm, respiratory_rate_peak_count, respiratory_rate_peak_mean_bpm, respiratory_rate_peak_sd_bpm, rrv_breath_interval_count, rrv_mean_breath_interval_s, rrv_median_breath_interval_s, rrv_sd_breath_interval_s, rrv_min_breath_interval_s, rrv_max_breath_interval_s, rrv_range_breath_interv ... [TRUNCATED]
 
 ===== POINT 9/38: t35s1@1791613992-319454 =====
 [TASK-DESC] Perform RRV analysis on the given data in "bio_eventrelated_100hz.csv". Clean the RSP signal and extract the inhalation peaks of the signal and the respiratory rate signal. Then use these features to analyze RRV, getting a variety of RRV indices including time domain, frequency domain, and nonlinear features. Save the results to 'pred_results/rrv_analysis_pred.csv'.
-[STEP-CODE t35 step 1] (10 chars)
-step_01.py
+[STEP-CODE t35 step 1] (22322 chars)
+#!/usr/bin/env python3
+"""
+RRV analysis for biosignals/bio_eventrelated_100hz.csv.
+
+Outputs:
+  pred_results/rrv_analysis_pred.csv
+
+This script:
+  1. Loads the RSP signal sampled at 100 Hz.
+  2. Cleans the RSP signal with a respiration-band Butterworth filter.
+  3. Extracts inhalation peaks from the cleaned RSP signal.
+  4. Builds an instantaneous respiratory-rate signal and extracts its peaks.
+  5. Computes respiratory-rate-variability indices:
+     - Time domain
+     - Frequency domain
+     - Nonlinear / complexity
+  6. Saves one row of features to the required CSV.
+"""
+
+import os
+import math
+import warnings
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+from scipy import signal, interpolate, stats
+from scipy.spatial import cKDTree
+
+
+FS = 100.0
+INPUT_PATH = Path("biosignals/bio_eventrelated_100hz.csv")
+OUTPUT_PATH = Path("pred_results/rrv_analysis_pred.csv")
+
+
+def _as_float_array(x):
+    x = pd.to_numeric(pd.Series(x), errors="coerce").to_numpy(dtype=float)
+    if np.any(~np.isfinite(x)):
+        idx = np.arange(len(x))
+        good = np.isfinite(x)
+        if good.sum() == 0:
+            raise ValueError("Signal contains no finite samples.")
+        x[~good] = np.interp(idx[~good], idx[good], x[good])
+    return x
+
+
+def clean_rsp_rspband(rsp, fs):
+    """Respiration-band cleaning: detrend + bandpass + light smoothing."""
+    rsp = _as_float_array(rsp)
+
+    # Remove slow linear trend and center.
+    x = signal.detrend(rsp, type="linear")
+    x = x - np.nanmedian(x)
+
+    # Respiration band. Upper bound kept below Nyquist.
+    low = 0.05
+    high = 1.00
+    nyq = fs / 2.0
+    sos = signal.butter(4, [low / nyq, high / nyq], btype="bandpass", output="sos")
+    cleaned = signal.sosfiltfilt(sos, x)
+
+    # Very light smoothing to reduce small high-frequency extrema.
+    win = int(round(0.25 * fs))
+    if win % 2 == 0:
+        win += 1
+    if win >= 5 and win < len(cleaned):
+        cleaned = signal.savgol_filter(cleaned, window_length=win, polyorder=2, mode="interp")
+
+    return cleaned
+
+
+def detect_inhalation_peaks(cleaned, fs):
+    """Adaptive peak picking for inhalation maxima in cleaned respiration."""
+    x = np.asarray(cleaned, dtype=float)
+    robust_sd = 1.4826 * np.nanmedian(np.abs(x - np.nanmedian(x)))
+    if not np.isfinite(robust_sd) or robust_sd <= 0:
+        robust_sd = float(np.nanstd(x))
+    if not np.isfinite(robust_sd) or robust_sd <= 0:
+        robust_sd = 1.0
+
+    # Try increasingly permissive settings until a plausible number is found.
+    attempts = [
+        dict(distance=1.50, prominence=0.25),
+        dict(distance=1.25, prominence=0.18),
+        dict(distance=1.00, prominence=0.12),
+        dict(distance=0.80, prominence=0.08),
+    ]
+
+    best_peaks = np.array([], dtype=int)
+    best_props = {}
+    for params in attempts:
+        peaks, props = signal.find_peaks(
+            x,
+            distance=max(1, int(round(params["distance"] * fs))),
+            prominence=params["prominence"] * robust_sd,
+        )
+        best_peaks, best_props = peaks, props
+        duration_min = len(x) / fs / 60.0
+        bpm = len(peaks) / duration_min if duration_min > 0 else 0
+        # Plausible broad physiological range.
+        if len(peaks) >= 3 and 3 <= bpm <= 45:
+            break
+
+    return best_peaks.astype(int), best_props
+
+
+def interval_outlier_mask(intervals):
+    """Mask physiologically plausible breath intervals and robust outliers."""
+    intervals = np.asarray(intervals, dtype=float)
+    mask = np.isfinite(intervals) & (intervals >= 1.0) & (intervals <= 15.0)
+    if mask.sum() >= 5:
+        vals = intervals[mask]
+        med = np.median(vals)
+        mad = np.median(np.abs(vals - med))
+        if mad > 0:
+            robust_z = 0.6745 * (intervals - med) / mad
+            mask &= np.abs(robust_z) <= 4.5
+    return mask
+
+
+def make_rate_signal(peak_samples, intervals_s, valid_interval_mask, n_samples, fs):
+    """
+    Instantaneous respiratory rate in breaths/min.
+    Intervals are assigned to the second peak of each interval and interpolated.
+    """
+    rate_signal = np.full(n_samples, np.nan, dtype=float)
+    if len(intervals_s) == 0 or valid_interval_mask.sum() < 2:
+        return rate_signal
+
+    times = peak_samples[1:] / fs
+    valid_times = times[valid_interval_mask]
+    valid_rates = 60.0 / intervals_s[valid_interval_mask]
+
+    order = np.argsort(valid_times)
+    valid_times = valid_times[order]
+    valid_rates = valid_rates[order]
+
+    # Remove duplicate times if any.
+    unique_times, unique_idx = np.unique(valid_times, return_index=True)
+    valid_times = unique_times
+    valid_rates = valid_rates[unique_idx]
+
+    if len(valid_times) == 1:
+        rate_signal[:] = valid_rates[0]
+        return rate_signal
+
+    sample_times = np.arange(n_samples) / fs
+    rate_signal = np.interp(sample_times, valid_times, valid_rates)
+
+    # Hold edge values.
+    rate_signal[sample_times < valid_times[0]] = valid_rates[0]
+    rate_signal[sample_times > valid_times[-1]] = valid_rates[-1]
+
+    # Smooth over about 5 seconds to describe respiratory-rate trajectory.
+    win = int(round(5.0 * fs))
+    if win % 2 == 0:
+        win += 1
+    if win >= 7 and win < len(rate_signal):
+        rate_signal = signal.savgol_filter(rate_signal, window_length=win, polyorder=2, mode="interp")
+
+    return rate_signal
+
+
+def detect_rate_peaks(rate_signal, fs):
+    rr = np.asarray(rate_signal, dtype=float)
+    finite = np.isfinite(rr)
+    if finite.sum() < int(10 * fs):
+        return np.array([], dtype=int), {}
+
+    sd = np.nanstd(rr)
+    prom = 0.05 * sd if sd > 0 else None
+    kwargs = dict(distance=max(1, int(round(5.0 * fs))))
+    if prom is not None and prom > 0:
+        kwargs["prominence"] = prom
+    peaks, props = signal.find_peaks(rr, **kwargs)
+    return peaks.astype(int), props
+
+
+def safe_mean(x):
+    x = np.asarray(x, dtype=float)
+    return float(np.nanmean(x)) if np.isfinite(x).any() else np.nan
+
+
+def safe_std(x, ddof=1):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    if len(x) <= ddof:
+        return np.nan
+    return float(np.std(x, ddof=ddof))
+
+
+def safe_median(x):
+    x = np.asarray(x, dtype=float)
+    return float(np.nanmedian(x)) if np.isfinite(x).any() else np.nan
+
+
+def safe_percentile(x, p):
+    x = np.asarray(x, dtype=float)
+    return float(np.nanpercentile(x, p)) if np.isfinite(x).any() else np.nan
+
+
+def sample_entropy(x, m=2, r=None):
+    """Sample entropy using Chebyshev-distance KDTree pair counts."""
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    n = len(x)
+    if n < m + 2:
+        return np.nan
+    if r is None:
+        sd = np.std(x, ddof=0)
+        if sd <= 0 or not np.isfinite(sd):
+            return np.nan
+        r = 0.2 * sd
+
+    def _embed(arr, dim):
+        return np.array([arr[i:i + dim] for i in range(len(arr) - dim + 1)])
+
+    xm = _embed(x, m)
+    xm1 = _embed(x, m + 1)
+
+    try:
+        cm = len(cKDTree(xm).query_pairs(r=r, p=np.inf))
+        cm1 = len(cKDTree(xm1).query_pairs(r=r, p=np.inf))
+    except Exception:
+        return np.nan
+
+    if cm <= 0 or cm1 <= 0:
+        return np.nan
+    return float(-np.log(cm1 / cm))
+
+
+def approximate_entropy(x, m=2, r=None):
+    """Approximate entropy; uses KDTree neighbor counts including self."""
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    n = len(x)
+    if n < m + 2:
+        return np.nan
+    if r is None:
+        sd = np.std(x, ddof=0)
+        if sd <= 0 or not np.isfinite(sd):
+            return np.nan
+        r = 0.2 * sd
+
+    def _phi(dim):
+        emb = np.array([x[i:i + dim] for i in range(n - dim + 1)])
+        tree = cKDTree(emb)
+        counts = np.array([len(tree.query_ball_point(row, r=r, p=np.inf)) for row in emb], dtype=float)
+        c = counts / len(emb)
+        c = np.maximum(c, np.finfo(float).tiny)
+        return np.mean(np.log(c))
+
+    try:
+        return float(_phi(m) - _phi(m + 1))
+    except Exception:
+        return np.nan
+
+
+def poincare_features(x):
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    if len(x) < 3:
+        return np.nan, np.nan, np.nan, np.nan
+    diff = np.diff(x)
+    sd_diff = np.std(diff, ddof=1) if len(diff) > 1 else np.nan
+    sd_x = np.std(x, ddof=1)
+    sd1 = math.sqrt(0.5) * sd_diff if np.isfinite(sd_diff) else np.nan
+    val = 2 * sd_x**2 - 0.5 * sd_diff**2 if np.isfinite(sd_x) and np.isfinite(sd_diff) else np.nan
+    sd2 = math.sqrt(max(val, 0.0)) if np.isfinite(val) else np.nan
+    ratio = sd1 / sd2 if np.isfinite(sd1) and np.isfinite(sd2) and sd2 > 0 else np.nan
+    area = math.pi * sd1 * sd2 if np.isfinite(sd1) and np.isfinite(sd2) else np.nan
+    return float(sd1), float(sd2), float(ratio), float(area)
+
+
+def dfa_alpha(x, scale_min, scale_max):
+    """Detrended fluctuation analysis alpha over scale range in samples/breaths."""
+    x = np.asarray(x, dtype=float)
+    x = x[np.isfinite(x)]
+    n = len(x)
+    if n < max(scale_min * 3, 12):
+        return np.nan
+
+    y = np.cumsum(x - np.mean(x))
+    max_scale = min(scale_max, n // 4)
+    if max_scale <= scale_min:
+        return np.nan
+
+    scales = np.unique(np.floor(np.logspace(np.log10(scale_min), np.log10(max_scale), 12)).astype(int))
+    flucts = []
+    used_scales = []
+    for s in scales:
+        if s < 4:
+            continue
+        nseg = n // s
+        if nseg < 2:
+            continue
+        rms = []
+        for i in range(nseg):
+            seg = y[i * s:(i + 1) * s]
+            t = np.arange(s)
+            coeff = np.polyfit(t, seg, 1)
+            trend = coeff[0] * t + coeff[1]
+            rms.append(np.sqrt(np.mean((seg - trend) ** 2)))
+        f = np.sqrt(np.mean(np.asarray(rms) ** 2))
+        if np.isfinite(f) and f > 0:
+            flucts.append(f)
+            used_scales.append(s)
+
+    if len(used_scales) < 3:
+        return np.nan
+    slope, _ = np.polyfit(np.log(used_scales), np.log(flucts), 1)
+    return float(slope)
+
+
+def higuchi_fd(x, kmax=10):
+    """Higuchi fractal dimension."""
+    x = np.asarray(x, dtype=float)
+    x = x
+... [TRUNCATED]
 [OBS t35 step 1 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Loaded biosignals/bio_eventrelated_100hz.csv with shape (14900, 4) | Columns: ['ECG', 'EDA', 'Photosensor', 'RSP'] | Cleaned RSP length: 14900 samples | Detected inhalation peaks: 44 | Detected respiratory-rate signal peaks: 11 | Key RRV results: |   recording_duration_min: 2.4833333333333334 |   rsp_inhalation_peak_rate_per_min: 17.71812080536913 |   rsp_valid_interval_count: 41 |   rrv_mean_bbi_s: 3.2963414634146337 |   rrv_sd_bbi_s: 0.47216922865409805 |   rrv_rmssd_s: 0.5653627154314352 |   rrv_mean_resp_rate_bpm: 18.545456420148945 |   rrv_sd_resp_rate_bpm: 2.515726772135705 |   rrv_lf_power: 0.03196606071344196 |   rrv_hf_power: 0.001780311088139523 |   rrv_lf_hf_ratio: 17.95532304797777 |   rrv_sample_entropy: 1.791759469228055 |   rrv_poincare_sd1_s: 0.4048621164462495 |   rrv_poincare_sd2_s: 0.5310124552609622 | Saved 68 RRV feature columns to pred_results/rrv_analysis_pred.csv |  | --- STDERR --- |
 
 ===== POINT 10/38: t37s2@1791614063-319742 =====
 [TASK-DESC] Load the heart rate data in the sheet "MIST3" and calculate several CFT parameters. The required parameters include baseline heart rate, onset heart rate, and onset heart rate percentage. Save the parameters in a JSON file "pred_results/cft_pred_results.json", where the keys for the three parameters should be "baseline_hr", "onset_hr", and "onset_hr_percent", respectively.
-[STEP-CODE t37 step 2] (10 chars)
-step_02.py
+[STEP-CODE t37 step 2] (1570 chars)
+import importlib.util
+import pkgutil
+import inspect
+from pathlib import Path
+
+mods = ["biopsykit", "neurokit2", "heartpy"]
+for m in mods:
+    spec = importlib.util.find_spec(m)
+    print(m, "installed:", spec is not None, "origin:", spec.origin if spec else None)
+
+if importlib.util.find_spec("biopsykit"):
+    import biopsykit
+    print("biopsykit version:", getattr(biopsykit, "__version__", "unknown"))
+    print("biopsykit path:", biopsykit.__path__)
+    names = []
+    for mod in pkgutil.walk_packages(biopsykit.__path__, biopsykit.__name__ + "."):
+        if any(k in mod.name.lower() for k in ["cft", "cold", "mist", "hr"]):
+            names.append(mod.name)
+    print("candidate modules:", names[:200])
+    for name in names:
+        try:
+            module = importlib.import_module(name)
+            print("\nMODULE", name)
+            for obj_name in dir(module):
+                if any(k in obj_name.lower() for k in ["cft", "cold", "hr", "heart", "onset", "baseline"]):
+                    obj = getattr(module, obj_name)
+                    print(" ", obj_name, type(obj))
+                    if inspect.isfunction(obj) or inspect.isclass(obj):
+                        try:
+                            print("   sig:", inspect.signature(obj))
+                        except Exception:
+                            pass
+                        doc = inspect.getdoc(obj)
+                        if doc:
+                            print("   doc:", doc[:500].replace("\n", " "))
+        except Exception as e:
+            print("FAILED import", name, repr(e))
 [OBS t37 step 2 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | biopsykit installed: True origin: /root/.local/share/mamba/envs/testbed/lib/python3.10/site-packages/biopsykit/__init__.py | neurokit2 installed: True origin: /root/.local/share/mamba/envs/testbed/lib/python3.10/site-packages/neurokit2/__init__.py | heartpy installed: False origin: None | biopsykit version: 0.9.0 | biopsykit path: ['/root/.local/share/mamba/envs/testbed/lib/python3.10/site-packages/biopsykit'] | candidate modules: ['biopsykit.protocols.cft', 'biopsykit.protocols.mist'] |  | MODULE biopsykit.protocols.cft |   CFT <class 'type'> |    sig: (name: Optional[str] = None, structure: Optional[Dict[str, int]] = None, **kwargs) |    doc: Class representing the Cold Face Test (CFT) and data collected while conducting the CFT. |   hr_plot <class 'function'> |    sig: (heart_rate: pandas.core.frame.DataFrame, plot_mean: Optional[bool] = True, plot_outlier: Optional[bool] = False, outlier: Optional[numpy.ndarray] = None, **kwargs) -> Tuple[matplotlib.figure.Figure, matplotlib.axes._axes.Axes] |    doc: Plot course of heart rate over time (tachogram).  This plot is also used as subplot in :func:`~biopsykit.signals.ecg.plotting.ecg_plot`.   Paramete ... [TRUNCATED]
 
 ===== POINT 11/38: t37s5@1791612745-277512 =====
 [TASK-DESC] Load the heart rate data in the sheet "MIST3" and calculate several CFT parameters. The required parameters include baseline heart rate, onset heart rate, and onset heart rate percentage. Save the parameters in a JSON file "pred_results/cft_pred_results.json", where the keys for the three parameters should be "baseline_hr", "onset_hr", and "onset_hr_percent", respectively.
-[STEP-CODE t37 step 5] (10 chars)
-step_05.py
+[STEP-CODE t37 step 5] (333 chars)
+# inspect_cft_formulas.py
+import inspect
+from biopsykit.protocols.cft import CFT
+
+for method in ["baseline_hr", "extract_cft_interval", "onset", "peak_bradycardia", "mean_bradycardia", "poly_fit"]:
+    print("\n" + "="*100)
+    print(method, inspect.signature(getattr(CFT, method)))
+    print(inspect.getsource(getattr(CFT, method)))
 [OBS t37 step 5 first 1200 chars]
 exit_code: 0 | --- STDOUT --- |  | ==================================================================================================== | baseline_hr (self, data: pandas.core.frame.DataFrame) -> float |     def baseline_hr(self, data: pd.DataFrame) -> float: |         """Compute mean heart rate during Baseline Interval. |  |         The Baseline Interval is data in the interval [``0``, ``cft_start``]. |  |         .. warning:: |             If ``cft_start`` is 0, it is assumed that no Baseline is present and the first heart rate value |             in the dataframe is used as CFT Baseline. |  |  |         Parameters |         ---------- |         data : :class:`~pandas.DataFrame` |             input data |  |  |         Returns |         ------- |         float |             mean heart rate during Baseline Interval |  |  |         Raises |         ------ |         :ex:`~biopsykit.utils.exceptions.FeatureComputationError` |             if data is shorter than the expected duration of the Baseline interval |  |         """ |         # start of baseline = start of recording |         bl_start = data.index[0] |         if self.cft_start == 0: |             warnings.warn( |              ... [TRUNCATED]
 
 ===== POINT 12/38: t37s8@1791614063-319742 =====
 [TASK-DESC] Load the heart rate data in the sheet "MIST3" and calculate several CFT parameters. The required parameters include baseline heart rate, onset heart rate, and onset heart rate percentage. Save the parameters in a JSON file "pred_results/cft_pred_results.json", where the keys for the three parameters should be "baseline_hr", "onset_hr", and "onset_hr_percent", respectively.
-[STEP-CODE t37 step 8] (10 chars)
-step_08.py
+[STEP-CODE t37 step 8] (101 chars)
+import inspect
+from biopsykit.protocols.cft import CFT
+
+src = inspect.getsource(CFT.onset)
+print(src)
 [OBS t37 step 8 first 1200 chars]
 exit_code: 0 | --- STDOUT --- |     def onset( |         self, |         data: pd.DataFrame, |         is_cft_interval: Optional[bool] = False, |         compute_baseline: Optional[bool] = True, |         hr_baseline: Optional[float] = None, |     ) -> Dict[str, Any]: |         """Compute **CFT onset**. |  |         The CFT onset is defined as the time point after beginning of the CFT Interval where three consecutive |         heart beats are lower than the Baseline heart rate (typically the Interval directly before the CFT). |  |         This function computes the following CFT onset parameter: |  |         * ``onset``: location of CFT onset. This value is the same datatype as the index of ``data`` |           (i.e., either a absolute datetime timestamp or a relative timestamp in time since recording). |         * ``onset_latency``: CFT onset latency, i.e., the duration between beginning of the CFT Interval and |           CFT onset in seconds. |         * ``onset_idx``: location of CFT onset as array index |         * ``onset_hr``: heart rate at CFT onset in bpm |         * ``onset_hr_brady_percent``: bradycardia at CFT onset, i.e., relative change of CFT onset heart rate compare ... [TRUNCATED]
 
 ===== POINT 13/38: t37s10@1791614063-319742 =====
 [TASK-DESC] Load the heart rate data in the sheet "MIST3" and calculate several CFT parameters. The required parameters include baseline heart rate, onset heart rate, and onset heart rate percentage. Save the parameters in a JSON file "pred_results/cft_pred_results.json", where the keys for the three parameters should be "baseline_hr", "onset_hr", and "onset_hr_percent", respectively.
-[STEP-CODE t37 step 10] (10 chars)
-step_10.py
+[STEP-CODE t37 step 10] (2287 chars)
+from pathlib import Path
+import json
+
+import pandas as pd
+from biopsykit.protocols import CFT
+
+# Load heart-rate data from the required sheet.
+xlsx_path = Path("mist_hr/hr_sample_mist.xlsx")
+sheet_name = "MIST3"
+df = pd.read_excel(xlsx_path, sheet_name=sheet_name)
+
+print("Loaded:", xlsx_path, "sheet:", sheet_name)
+print("Shape:", df.shape)
+print("Columns:", list(df.columns))
+print("First rows:")
+print(df.head().to_string(index=False))
+print("Last rows:")
+print(df.tail().to_string(index=False))
+
+# Prepare the dataframe expected by BioPsyKit's CFT implementation:
+# a DatetimeIndex and a single heart-rate column.
+hr = df.copy()
+hr["time"] = pd.to_datetime(hr["time"])
+hr = hr.set_index("time")[["Heart_Rate"]].sort_index()
+hr = hr.dropna()
+
+print("\nPrepared HR data:")
+print("Shape:", hr.shape)
+print("Index type:", type(hr.index).__name__)
+print("Start:", hr.index[0], "End:", hr.index[-1])
+print("Duration seconds:", (hr.index[-1] - hr.index[0]).total_seconds())
+print(
+    "HR min/mean/max:",
+    float(hr["Heart_Rate"].min()),
+    float(hr["Heart_Rate"].mean()),
+    float(hr["Heart_Rate"].max()),
+)
+
+# Compute CFT parameters using the standard CFT structure:
+# 60 s Baseline, 120 s CFT exposure, 60 s Recovery.
+cft = CFT()
+params_all = cft.compute_cft_parameter(hr, return_dict=True)
+
+print("\nAll computed CFT parameters:")
+for key, value in params_all.items():
+    print(f"{key}: {value} ({type(value).__name__})")
+
+# Extract required parameters and convert numpy/pandas scalar types to JSON-native floats.
+required_keys = ["baseline_hr", "onset_hr", "onset_hr_percent"]
+results = {}
+missing_keys = []
+for key in required_keys:
+    if key not in params_all:
+        missing_keys.append(key)
+    else:
+        value = params_all[key]
+        if hasattr(value, "item"):
+            value = value.item()
+        results[key] = float(value)
+
+if missing_keys:
+    raise KeyError(f"Missing required computed keys: {missing_keys}")
+
+# Save to the exact required output path.
+out_path = Path("pred_results/cft_pred_results.json")
+out_path.parent.mkdir(parents=True, exist_ok=True)
+with out_path.open("w", encoding="utf-8") as f:
+    json.dump(results, f, indent=2, sort_keys=True)
+
+print("\nSaved required results to:", out_path)
+print(json.dumps(results, indent=2, sort_keys=True))
 [OBS t37 step 10 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Loaded: mist_hr/hr_sample_mist.xlsx sheet: MIST3 | Shape: (350, 2) | Columns: ['time', 'Heart_Rate'] | First rows: |                    time  Heart_Rate | 2019-10-22 11:56:57.961  103.783784 | 2019-10-22 11:56:58.539   98.461538 | 2019-10-22 11:56:59.148   97.834395 | 2019-10-22 11:56:59.762  101.721854 | 2019-10-22 11:57:00.352  108.169014 | Last rows: |                    time  Heart_Rate | 2019-10-22 12:00:34.437  114.626866 | 2019-10-22 12:00:34.961  114.626866 | 2019-10-22 12:00:35.484  116.363636 | 2019-10-22 12:00:36.000  102.715720 | 2019-10-22 12:00:36.531   91.933174 |  | Prepared HR data: | Shape: (350, 1) | Index type: DatetimeIndex | Start: 2019-10-22 11:56:57.961000 End: 2019-10-22 12:00:36.531000 | Duration seconds: 218.57 | HR min/mean/max: 80.41884816753927 96.4139336148287 118.1538461538462 |  | All computed CFT parameters: | baseline_hr: 96.87033705099753 (float) | cft_start_idx: 97 (int) | onset: 2019-10-22 11:57:59.676000 (Timestamp) | onset_latency: 1.297 (float) | onset_idx: 2 (int) | onset_hr: 89.82456140350877 (float64) | onset_hr_percent: 7.273408828731032 (float64) | onset_slope: -5.4323636449412245 (float64) | peak_brady:  ... [TRUNCATED]
 
 ===== POINT 14/38: t40s2@1791613483-305791 =====
 [TASK-DESC] Train a random forest model to predict whether a given chemical structure has Drug-Induced Liver Injury (DILI) concerns, based on the given features. Use the training examples to perform hyperparameter search and model training, and save the prediction results to "pred_results/MD_{data_split}_RF.csv" where data_split is the name of different training splits ('MCNC', 'MCLCNC', and 'all'). Add a ’label’ column and put the predicted labels (’DILI’ or ’NoDILI’) in the column.
-[STEP-CODE t40 step 2] (10 chars)
-step_02.py
+[STEP-CODE t40 step 2] (2264 chars)
+#!/usr/bin/env python3
+import os
+import pandas as pd
+import numpy as np
+
+pd.set_option("display.width", 200)
+pd.set_option("display.max_columns", 50)
+
+desc_path = "dili_MD/mol_descriptors_training.csv"
+meta_path = "dili_MD/standardized_compounds_excl_ambiguous_cluster.csv"
+test_path = "dili_MD/test.csv"
+
+desc = pd.read_csv(desc_path)
+meta = pd.read_csv(meta_path)
+test = pd.read_csv(test_path)
+
+print("Shapes:")
+print("desc", desc.shape)
+print("meta", meta.shape)
+print("test", test.shape)
+
+print("\nMETA columns:")
+for i, c in enumerate(meta.columns):
+    print(i, repr(c), str(meta[c].dtype), "nunique", meta[c].nunique(dropna=False))
+
+print("\nTEST columns:")
+for i, c in enumerate(test.columns):
+    print(i, repr(c), str(test[c].dtype), "nunique", test[c].nunique(dropna=False))
+
+print("\nMETA head selected:")
+print(meta.head(10).to_string())
+
+print("\nTEST head:")
+print(test.head(10).to_string())
+
+print("\nMeta value counts for likely label/split columns:")
+for c in meta.columns:
+    lc = c.lower()
+    if any(k in lc for k in ["dili", "label", "split", "set", "train", "test", "concern", "cluster"]):
+        print("\n", c)
+        print(meta[c].value_counts(dropna=False).head(50).to_string())
+
+print("\nTest value counts for likely columns:")
+for c in test.columns:
+    lc = c.lower()
+    if any(k in lc for k in ["dili", "label", "split", "set", "train", "test", "concern", "cluster"]):
+        print("\n", c)
+        print(test[c].value_counts(dropna=False).head(50).to_string())
+
+print("\nDescriptor index/first rows:")
+print(desc.iloc[:10, :5].to_string())
+print("desc first col min max unique?", desc.iloc[:,0].min(), desc.iloc[:,0].max(), desc.iloc[:,0].nunique())
+
+# Check alignment: descriptor rows vs meta rows
+print("\nAlignment checks:")
+print("same n desc/meta?", len(desc)==len(meta))
+if len(desc)==len(meta):
+    print(pd.concat([desc.iloc[:5, [0]], meta.iloc[:5, :6]], axis=1).to_string())
+
+# Non-finite counts in descriptors
+X = desc.drop(columns=[desc.columns[0]])
+arr = X.to_numpy(dtype=float)
+print("\nDescriptor nonfinite:", np.size(arr) - np.isfinite(arr).sum(), "NaN:", np.isnan(arr).sum(), "inf:", np.isinf(arr).sum())
+print("Columns with any NaN:", X.columns[X.isna().any()].tolist()[:20], "count", int(X.isna().any().sum()))
 [OBS t40 step 2 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Shapes: | desc (923, 1176) | meta (923, 6) | test (55, 1176) |  | META columns: | 0 'Unnamed: 0' int64 nunique 923 | 1 'PubChem_CID' int64 nunique 923 | 2 'Compound Name' object nunique 903 | 3 'standardised_smiles' object nunique 904 | 4 'vDILIConcern' object nunique 4 | 5 'cluster' int64 nunique 632 |  | TEST columns: | 0 'Unnamed: 0' int64 nunique 55 | 1 'ABC' float64 nunique 55 | 2 'ABCGG' float64 nunique 55 | 3 'nAcid' float64 nunique 3 | 4 'nBase' float64 nunique 4 | 5 'SpAbs_A' float64 nunique 55 | 6 'SpMax_A' float64 nunique 55 | 7 'SpDiam_A' float64 nunique 55 | 8 'SpAD_A' float64 nunique 55 | 9 'SpMAD_A' float64 nunique 55 | 10 'LogEE_A' float64 nunique 55 | 11 'VE1_A' float64 nunique 55 | 12 'VE2_A' float64 nunique 55 | 13 'VE3_A' float64 nunique 55 | 14 'VR1_A' float64 nunique 55 | 15 'VR2_A' float64 nunique 55 | 16 'VR3_A' float64 nunique 55 | 17 'nAromAtom' float64 nunique 12 | 18 'nAromBond' float64 nunique 11 | 19 'nAtom' float64 nunique 36 | 20 'nHeavyAtom' float64 nunique 27 | 21 'nSpiro' float64 nunique 3 | 22 'nBridgehead' float64 nunique 4 | 23 'nHetero' float64 nunique 13 | 24 'nH' float64 nunique 27 | 25 'nB' float64 nunique 1  ... [TRUNCATED]
 
 ===== POINT 15/38: t40s2@1791614542-345089 =====
 [TASK-DESC] Train a random forest model to predict whether a given chemical structure has Drug-Induced Liver Injury (DILI) concerns, based on the given features. Use the training examples to perform hyperparameter search and model training, and save the prediction results to "pred_results/MD_{data_split}_RF.csv" where data_split is the name of different training splits ('MCNC', 'MCLCNC', and 'all'). Add a ’label’ column and put the predicted labels (’DILI’ or ’NoDILI’) in the column.
-[STEP-CODE t40 step 2] (10 chars)
-step_02.py
+[STEP-CODE t40 step 2] (6685 chars)
+#!/usr/bin/env python3
+import os
+import time
+import json
+import warnings
+import numpy as np
+import pandas as pd
+
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import StratifiedKFold, RandomizedSearchCV
+from sklearn.metrics import balanced_accuracy_score, accuracy_score, f1_score, make_scorer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.feature_selection import VarianceThreshold
+
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+
+np.random.seed(42)
+
+BASE = "dili_MD"
+OUTDIR = "pred_results"
+os.makedirs(OUTDIR, exist_ok=True)
+
+desc_path = os.path.join(BASE, "mol_descriptors_training.csv")
+meta_path = os.path.join(BASE, "standardized_compounds_excl_ambiguous_cluster.csv")
+test_path = os.path.join(BASE, "test.csv")
+
+desc = pd.read_csv(desc_path)
+meta = pd.read_csv(meta_path)
+test = pd.read_csv(test_path)
+
+print("Loaded:")
+print("  training descriptors:", desc.shape)
+print("  metadata:", meta.shape)
+print("  test descriptors:", test.shape)
+
+# Drop CSV index columns; keep a clean copy of test for output with original columns.
+index_like = [c for c in desc.columns if str(c).startswith("Unnamed")]
+feature_cols = [c for c in desc.columns if c not in index_like]
+print("Index-like columns dropped from model:", index_like)
+print("Feature count:", len(feature_cols))
+print("Train/test feature columns equal:", feature_cols == [c for c in test.columns if c not in [x for x in test.columns if str(x).startswith('Unnamed')]])
+
+X_all = desc[feature_cols].replace([np.inf, -np.inf], np.nan)
+X_test = test[feature_cols].replace([np.inf, -np.inf], np.nan)
+
+# Ensure alignment of descriptor rows and metadata rows.
+if len(desc) != len(meta):
+    raise ValueError(f"Descriptor rows ({len(desc)}) != metadata rows ({len(meta)})")
+if "vDILIConcern" not in meta.columns:
+    raise ValueError("Metadata file does not contain vDILIConcern")
+
+print("\nClass counts in metadata:")
+print(meta["vDILIConcern"].value_counts().to_string())
+
+# Split definitions inferred from benchmark names:
+# MCNC: Most-DILI-Concern vs No-DILI-Concern.
+# MCLCNC: Most/Less-DILI-Concern vs No-DILI-Concern.
+# all: Most/Less-DILI-Concern vs No-DILI-Concern/sider_inactive.
+split_defs = {
+    "MCNC": {
+        "DILI": ["vMost-DILI-Concern"],
+        "NoDILI": ["vNo-DILI-Concern"],
+    },
+    "MCLCNC": {
+        "DILI": ["vMost-DILI-Concern", "vLess-DILI-Concern"],
+        "NoDILI": ["vNo-DILI-Concern"],
+    },
+    "all": {
+        "DILI": ["vMost-DILI-Concern", "vLess-DILI-Concern"],
+        "NoDILI": ["vNo-DILI-Concern", "sider_inactive"],
+    },
+}
+
+param_distributions = {
+    "rf__n_estimators": [300, 500, 800],
+    "rf__max_features": ["sqrt", "log2", 0.2, 0.4],
+    "rf__max_depth": [None, 8, 16, 32],
+    "rf__min_samples_split": [2, 5, 10],
+    "rf__min_samples_leaf": [1, 2, 4],
+    "rf__bootstrap": [True],
+    "rf__class_weight": ["balanced", "balanced_subsample", None],
+}
+
+summary = {}
+for split_name, definition in split_defs.items():
+    t0 = time.time()
+    dili_vals = set(definition["DILI"])
+    nodili_vals = set(definition["NoDILI"])
+    use_mask = meta["vDILIConcern"].isin(dili_vals | nodili_vals)
+    y_labels = meta.loc[use_mask, "vDILIConcern"].map(lambda v: "DILI" if v in dili_vals else "NoDILI")
+    y = y_labels.map({"NoDILI": 0, "DILI": 1}).astype(int).values
+    X = X_all.loc[use_mask].copy()
+    
+    print(f"\n=== Split {split_name} ===")
+    print("Training rows:", X.shape[0], "features:", X.shape[1])
+    print("Training label counts:")
+    print(pd.Series(y_labels).value_counts().to_string())
+    
+    min_class = int(pd.Series(y).value_counts().min())
+    n_splits = max(2, min(5, min_class))
+    cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
+    
+    pipe = Pipeline([
+        ("imputer", SimpleImputer(strategy="median")),
+        ("var", VarianceThreshold(threshold=0.0)),
+        ("rf", RandomForestClassifier(random_state=42, n_jobs=-1, oob_score=False)),
+    ])
+    
+    # Moderate randomized search: enough to satisfy hyperparameter search while staying reliable.
+    search = RandomizedSearchCV(
+        estimator=pipe,
+        param_distributions=param_distributions,
+        n_iter=28,
+        scoring=make_scorer(balanced_accuracy_score),
+        cv=cv,
+        random_state=42,
+        n_jobs=-1,
+        refit=True,
+        verbose=0,
+        error_score="raise",
+        return_train_score=True,
+    )
+    search.fit(X, y)
+    best = search.best_estimator_
+    
+    # Cross-validation result summary
+    cvres = pd.DataFrame(search.cv_results_).sort_values("rank_test_score")
+    print("Best CV balanced accuracy:", round(float(search.best_score_), 5))
+    print("Best params:", json.dumps(search.best_params_, sort_keys=True))
+    print("Top 5 CV candidates:")
+    print(cvres[["rank_test_score", "mean_test_score", "std_test_score", "mean_train_score", "params"]].head(5).to_string(index=False))
+    
+    # Apparent training metrics for sanity only.
+    pred_train = best.predict(X)
+    train_bal_acc = balanced_accuracy_score(y, pred_train)
+    train_acc = accuracy_score(y, pred_train)
+    train_f1 = f1_score(y, pred_train)
+    print("Refit training balanced_acc/acc/f1:", round(train_bal_acc, 5), round(train_acc, 5), round(train_f1, 5))
+    
+    pred_test = best.predict(X_test)
+    label_test = np.where(pred_test == 1, "DILI", "NoDILI")
+    
+    out = test.copy()
+    out["label"] = label_test
+    out_path = os.path.join(OUTDIR, f"MD_{split_name}_RF.csv")
+    out.to_csv(out_path, index=False)
+    
+    pred_counts = pd.Series(label_test).value_counts()
+    print("Saved:", out_path, "shape:", out.shape)
+    print("Prediction counts:")
+    print(pred_counts.to_string())
+    
+    summary[split_name] = {
+        "n_train": int(X.shape[0]),
+        "n_features": int(X.shape[1]),
+        "label_counts": pd.Series(y_labels).value_counts().to_dict(),
+        "cv_splits": int(n_splits),
+        "best_cv_balanced_accuracy": float(search.best_score_),
+        "best_params": search.best_params_,
+        "train_balanced_accuracy": float(train_bal_acc),
+        "train_accuracy": float(train_acc),
+        "train_f1": float(train_f1),
+        "prediction_counts": pred_counts.to_dict(),
+        "output_path": out_path,
+        "seconds": round(time.time() - t0, 2),
+    }
+
+summary_path = os.path.join(OUTDIR, "MD_RF_training_summary.json")
+with open(summary_path, "w") as f:
+    json.dump(summary, f, indent=2)
+print("\nWrote summary:", summary_path)
+print(json.dumps(summary, indent=2))
+print("\nRequired file exists:", os.path.exists(os.path.join(OUTDIR, "MD_MCNC_RF.csv")))
 [OBS t40 step 2 first 1200 chars]
 exit_code: None | --- STDOUT --- |  | --- STDERR --- |  | [TIMEOUT after 300.0s]
 
 ===== POINT 16/38: t40s4@1791613483-305791 =====
 [TASK-DESC] Train a random forest model to predict whether a given chemical structure has Drug-Induced Liver Injury (DILI) concerns, based on the given features. Use the training examples to perform hyperparameter search and model training, and save the prediction results to "pred_results/MD_{data_split}_RF.csv" where data_split is the name of different training splits ('MCNC', 'MCLCNC', and 'all'). Add a ’label’ column and put the predicted labels (’DILI’ or ’NoDILI’) in the column.
-[STEP-CODE t40 step 4] (10 chars)
-step_04.py
+[STEP-CODE t40 step 4] (5926 chars)
+#!/usr/bin/env python3
+import os
+import json
+import time
+import warnings
+import numpy as np
+import pandas as pd
+
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_selection import VarianceThreshold
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import balanced_accuracy_score, make_scorer
+from sklearn.model_selection import RandomizedSearchCV, StratifiedKFold, cross_val_score
+from sklearn.pipeline import Pipeline
+
+warnings.filterwarnings("ignore")
+
+def log(*args):
+    print(*args, flush=True)
+
+def json_safe(x):
+    if isinstance(x, (np.integer,)):
+        return int(x)
+    if isinstance(x, (np.floating,)):
+        return float(x)
+    if isinstance(x, dict):
+        return {k: json_safe(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [json_safe(v) for v in x]
+    return x
+
+t0 = time.time()
+RANDOM_STATE = 20251010
+os.makedirs("pred_results", exist_ok=True)
+
+log("Loading data...")
+desc = pd.read_csv("dili_MD/mol_descriptors_training.csv")
+meta = pd.read_csv("dili_MD/standardized_compounds_excl_ambiguous_cluster.csv")
+test = pd.read_csv("dili_MD/test.csv")
+log("Shapes:", {"desc": desc.shape, "meta": meta.shape, "test": test.shape})
+log("vDILIConcern counts:\n" + meta["vDILIConcern"].value_counts().to_string())
+
+id_col = desc.columns[0]
+feature_cols = [c for c in desc.columns if c != id_col]
+X_all = desc[feature_cols].replace([np.inf, -np.inf], np.nan)
+X_test = test[feature_cols].replace([np.inf, -np.inf], np.nan)
+
+all_nan = X_all.columns[X_all.isna().all()].tolist()
+if all_nan:
+    log("Dropping all-NaN columns:", len(all_nan))
+    X_all = X_all.drop(columns=all_nan)
+    X_test = X_test.drop(columns=all_nan)
+
+# Pre-impute once for quick constant-column reporting; final imputation remains in pipeline.
+constant_count = int((X_all.nunique(dropna=False) <= 1).sum())
+log("Features:", X_all.shape[1], "constant-like columns:", constant_count,
+    "NaNs train/test:", int(X_all.isna().sum().sum()), int(X_test.isna().sum().sum()))
+
+split_defs = {
+    "MCNC": {
+        "positive": {"vMost-DILI-Concern"},
+        "include": {"vMost-DILI-Concern", "vNo-DILI-Concern"},
+    },
+    "MCLCNC": {
+        "positive": {"vMost-DILI-Concern", "vLess-DILI-Concern"},
+        "include": {"vMost-DILI-Concern", "vLess-DILI-Concern", "vNo-DILI-Concern"},
+    },
+    "all": {
+        "positive": {"vMost-DILI-Concern", "vLess-DILI-Concern"},
+        "include": None,
+    },
+}
+
+# Compact but genuine hyperparameter search to stay within runtime.
+param_distributions = {
+    "rf__n_estimators": [120, 180, 240],
+    "rf__max_depth": [None, 12, 20, 32],
+    "rf__max_features": ["sqrt", "log2", 0.25],
+    "rf__min_samples_split": [2, 4, 8],
+    "rf__min_samples_leaf": [1, 2, 4],
+    "rf__criterion": ["gini", "entropy"],
+}
+
+summary = {}
+for split_name, spec in split_defs.items():
+    log("\n=== Training split:", split_name, "===")
+    labels_raw = meta["vDILIConcern"].astype(str)
+    if spec["include"] is None:
+        mask = np.ones(len(meta), dtype=bool)
+    else:
+        mask = labels_raw.isin(spec["include"]).to_numpy()
+
+    X = X_all.loc[mask]
+    raw = labels_raw.loc[mask]
+    y = raw.isin(spec["positive"]).astype(int).to_numpy()
+
+    log("Rows/features:", X.shape)
+    log("Raw labels:\n" + raw.value_counts().to_string())
+    log("Binary counts:", {"DILI": int((y == 1).sum()), "NoDILI": int((y == 0).sum())})
+
+    min_class = int(np.bincount(y).min())
+    n_splits = max(2, min(3, min_class))
+    cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=RANDOM_STATE)
+
+    pipe = Pipeline([
+        ("imputer", SimpleImputer(strategy="median")),
+        ("var", VarianceThreshold(threshold=0.0)),
+        ("rf", RandomForestClassifier(
+            random_state=RANDOM_STATE,
+            n_jobs=-1,
+            class_weight="balanced_subsample",
+        )),
+    ])
+
+    search = RandomizedSearchCV(
+        pipe,
+        param_distributions=param_distributions,
+        n_iter=8,
+        scoring=make_scorer(balanced_accuracy_score),
+        cv=cv,
+        random_state=RANDOM_STATE,
+        n_jobs=-1,
+        refit=True,
+        verbose=0,
+        error_score=np.nan,
+    )
+    search.fit(X, y)
+    best_model = search.best_estimator_
+
+    scores = cross_val_score(
+        best_model, X, y, cv=cv,
+        scoring=make_scorer(balanced_accuracy_score),
+        n_jobs=-1,
+    )
+
+    log("Best search balanced accuracy:", round(float(search.best_score_), 4))
+    log("Best params:", search.best_params_)
+    log("Check CV balanced accuracy mean±sd:", round(float(scores.mean()), 4), "±", round(float(scores.std()), 4))
+
+    pred = best_model.predict(X_test)
+    pred_labels = np.where(pred == 1, "DILI", "NoDILI")
+
+    out = test.copy()
+    out["label"] = pred_labels
+    out_path = f"pred_results/MD_{split_name}_RF.csv"
+    out.to_csv(out_path, index=False)
+
+    counts = pd.Series(pred_labels).value_counts().to_dict()
+    log("Saved", out_path, "shape", out.shape, "prediction counts", counts)
+
+    summary[split_name] = {
+        "n_train": int(X.shape[0]),
+        "n_features_input": int(X.shape[1]),
+        "raw_label_counts": {str(k): int(v) for k, v in raw.value_counts().to_dict().items()},
+        "binary_counts": {"DILI": int((y == 1).sum()), "NoDILI": int((y == 0).sum())},
+        "best_search_balanced_accuracy": float(search.best_score_),
+        "cv_balanced_accuracy_mean": float(scores.mean()),
+        "cv_balanced_accuracy_sd": float(scores.std()),
+        "best_params": json_safe(search.best_params_),
+        "prediction_counts": {str(k): int(v) for k, v in counts.items()},
+        "output": out_path,
+    }
+
+with open("pred_results/RF_training_summary.json", "w") as f:
+    json.dump(summary, f, indent=2)
+
+log("\nRequired output exists:", os.path.exists("pred_results/MD_MCNC_RF.csv"))
+log("Summary saved: pred_results/RF_training_summary.json")
+log("Elapsed seconds:", round(time.time() - t0, 2))
 [OBS t40 step 4 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Loading data... | Shapes: {'desc': (923, 1176), 'meta': (923, 6), 'test': (55, 1176)} | vDILIConcern counts: | vDILIConcern | sider_inactive        262 | vLess-DILI-Concern    260 | vNo-DILI-Concern      227 | vMost-DILI-Concern    174 | Features: 1175 constant-like columns: 138 NaNs train/test: 0 0 |  | === Training split: MCNC === | Rows/features: (401, 1175) | Raw labels: | vDILIConcern | vNo-DILI-Concern      227 | vMost-DILI-Concern    174 | Binary counts: {'DILI': 174, 'NoDILI': 227} | Best search balanced accuracy: 0.7307 | Best params: {'rf__n_estimators': 120, 'rf__min_samples_split': 8, 'rf__min_samples_leaf': 2, 'rf__max_features': 0.25, 'rf__max_depth': 12, 'rf__criterion': 'entropy'} | Check CV balanced accuracy mean±sd: 0.7307 ± 0.0494 | Saved pred_results/MD_MCNC_RF.csv shape (55, 1177) prediction counts {'NoDILI': 33, 'DILI': 22} |  | === Training split: MCLCNC === | Rows/features: (661, 1175) | Raw labels: | vDILIConcern | vLess-DILI-Concern    260 | vNo-DILI-Concern      227 | vMost-DILI-Concern    174 | Binary counts: {'DILI': 434, 'NoDILI': 227} | Best search balanced accuracy: 0.6831 | Best params: {'rf__n_estimators': 120, 'rf__ ... [TRUNCATED]
 
 ===== POINT 17/38: t44s4@1791613127-299358 =====
 [TASK-DESC] Analyze the inertial measurement unit (IMU) data collected during sleep and compute sleep endpoints. Load the given data and compute the following sleep endpoints: time of falling asleep, time of awakening, and total duration spent sleeping. The three values should be saved in a JSON file "pred_results/imu_pred.json", and the keys for them are "sleep_onset", "wake_onset", and "total_sleep_duration", respectively.
-[STEP-CODE t44 step 4] (10 chars)
-step_04.py
+[STEP-CODE t44 step 4] (2668 chars)
+#!/usr/bin/env python3
+import json
+import time
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+from biopsykit.sleep.sleep_processing_pipeline import predict_pipeline_acceleration
+
+Path("pred_results").mkdir(exist_ok=True)
+
+df = pd.read_pickle("sleep_imu_data/sleep_data.pkl")
+acc = df[["acc_x", "acc_y", "acc_z"]]
+dt = pd.Series(df.index).diff().dt.total_seconds().median()
+sampling_rate = 1.0 / dt
+print("Loaded acceleration:", acc.shape)
+print("Index start/end:", acc.index[0], acc.index[-1])
+print("Median dt:", dt, "sampling_rate:", sampling_rate)
+
+t0 = time.time()
+try:
+    result = predict_pipeline_acceleration(
+        acc,
+        sampling_rate=sampling_rate,
+        convert_to_g=True,
+        algorithm_type="cole_kripke",
+        epoch_length=60,
+    )
+    print("Pipeline completed in seconds:", time.time() - t0)
+    print("Result type:", type(result), "keys:", list(result.keys()) if isinstance(result, dict) else None)
+    if isinstance(result, dict):
+        for k, v in result.items():
+            print("\nKEY:", k, "TYPE:", type(v))
+            if isinstance(v, pd.DataFrame):
+                print("shape:", v.shape)
+                print(v.head().to_string())
+                print(v.tail().to_string())
+            else:
+                print(repr(v)[:2000])
+        endpoints = result.get("sleep_endpoints", {})
+        print("\nSleep endpoints:")
+        print(repr(endpoints))
+        # Save raw endpoint repr for inspection
+        Path("pred_results/pipeline_endpoints_repr.txt").write_text(repr(endpoints))
+        # If possible, save requested JSON now
+        def jsonable(x):
+            if isinstance(x, (pd.Timestamp, np.datetime64)):
+                return str(pd.Timestamp(x))
+            if isinstance(x, pd.Timedelta):
+                return str(x)
+            if isinstance(x, np.timedelta64):
+                return str(pd.Timedelta(x))
+            if isinstance(x, (np.integer,)):
+                return int(x)
+            if isinstance(x, (np.floating,)):
+                return float(x)
+            return x
+        if endpoints:
+            pred = {
+                "sleep_onset": jsonable(endpoints.get("sleep_onset")),
+                "wake_onset": jsonable(endpoints.get("wake_onset")),
+                "total_sleep_duration": jsonable(endpoints.get("total_sleep_duration")),
+            }
+            Path("pred_results/imu_pred.json").write_text(json.dumps(pred, indent=2))
+            print("Wrote pred_results/imu_pred.json:")
+            print(json.dumps(pred, indent=2))
+except Exception as e:
+    print("Pipeline failed:", type(e).__name__, repr(e))
+    import traceback
+    traceback.print_exc()
 [OBS t44 step 4 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Loaded acceleration: (4048332, 3) | Index start/end: 2019-09-03 02:06:18.251953+02:00 2019-09-03 07:35:45.493164+02:00 | Median dt: 0.004883 sampling_rate: 204.79213598197828 | Pipeline completed in seconds: 14.839076280593872 | Result type: <class 'dict'> keys: ['wear_detection', 'activity_counts', 'sleep_wake_prediction', 'major_wear_block', 'rest_periods', 'bed_interval', 'sleep_endpoints'] |  | KEY: wear_detection TYPE: <class 'pandas.core.frame.DataFrame'> | shape: (19, 3) |    wear                            start                              end | 0   1.0 2019-09-03 02:06:18.251953+02:00 2019-09-03 03:06:18.105468+02:00 | 1   1.0 2019-09-03 02:21:18.217773+02:00 2019-09-03 03:21:18.071289+02:00 | 2   1.0 2019-09-03 02:36:18.183593+02:00 2019-09-03 03:36:18.037109+02:00 | 3   1.0 2019-09-03 02:51:18.149414+02:00 2019-09-03 03:51:18.002929+02:00 | 4   1.0 2019-09-03 03:06:18.115234+02:00 2019-09-03 04:06:17.968750+02:00 |     wear                            start                              end | 14   1.0 2019-09-03 05:36:17.773437+02:00 2019-09-03 06:36:17.626953+02:00 | 15   1.0 2019-09-03 05:51:17.739257+02:00 2019-09-03 06:51:17.592773+02:0 ... [TRUNCATED]
 
 ===== POINT 18/38: t44s4@1791614343-341588 =====
 [TASK-DESC] Analyze the inertial measurement unit (IMU) data collected during sleep and compute sleep endpoints. Load the given data and compute the following sleep endpoints: time of falling asleep, time of awakening, and total duration spent sleeping. The three values should be saved in a JSON file "pred_results/imu_pred.json", and the keys for them are "sleep_onset", "wake_onset", and "total_sleep_duration", respectively.
-[STEP-CODE t44 step 4] (10 chars)
-step_04.py
+[STEP-CODE t44 step 4] (653 chars)
+#!/usr/bin/env python3
+import inspect
+from biopsykit.sleep.sleep_processing_pipeline import predict_pipeline_acceleration
+from biopsykit.sleep.sleep_endpoints import compute_sleep_endpoints
+import biopsykit.sleep.sleep_processing_pipeline.sleep_processing_pipeline as spp
+
+src = inspect.getsource(spp)
+lines = src.splitlines()
+print("sleep_processing_pipeline source line count:", len(lines))
+for i, line in enumerate(lines[:260], start=1):
+    print(f"{i:03d}: {line}")
+
+print("\ncompute_sleep_endpoints full source:")
+src2 = inspect.getsource(compute_sleep_endpoints)
+for i, line in enumerate(src2.splitlines(), start=1):
+    print(f"{i:03d}: {line}")
 [OBS t44 step 4 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | sleep_processing_pipeline source line count: 135 | 001: """Functions to process sleep data from raw IMU data or Actigraph data.""" | 002: from typing import Any, Dict, Optional, Sequence, Union | 003:  | 004: import numpy as np | 005: from biopsykit.signals.imu import convert_acc_data_to_g | 006: from biopsykit.signals.imu.activity_counts import ActivityCounts | 007: from biopsykit.signals.imu.rest_periods import RestPeriods | 008: from biopsykit.signals.imu.wear_detection import WearDetection | 009: from biopsykit.sleep.sleep_endpoints import compute_sleep_endpoints | 010: from biopsykit.sleep.sleep_wake_detection.sleep_wake_detection import SleepWakeDetection | 011: from biopsykit.utils._types import arr_t | 012: from biopsykit.utils.array_handling import accumulate_array | 013:  | 014:  | 015: def predict_pipeline_acceleration( | 016:     data: arr_t, sampling_rate: float, convert_to_g: Optional[bool] = True, **kwargs | 017: ) -> Dict[str, Any]: | 018:     """Apply sleep processing pipeline on raw acceleration data. | 019:  | 020:     This function processes raw acceleration data collected during sleep. The pipeline consists of the following steps ... [TRUNCATED]
 
 ===== POINT 19/38: t44s5@1791613127-299358 =====
 [TASK-DESC] Analyze the inertial measurement unit (IMU) data collected during sleep and compute sleep endpoints. Load the given data and compute the following sleep endpoints: time of falling asleep, time of awakening, and total duration spent sleeping. The three values should be saved in a JSON file "pred_results/imu_pred.json", and the keys for them are "sleep_onset", "wake_onset", and "total_sleep_duration", respectively.
-[STEP-CODE t44 step 5] (10 chars)
-step_05.py
+[STEP-CODE t44 step 5] (1097 chars)
+#!/usr/bin/env python3
+import json
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+from biopsykit.sleep.sleep_processing_pipeline import predict_pipeline_acceleration
+
+out_path = Path("pred_results/imu_pred.json")
+out_path.parent.mkdir(parents=True, exist_ok=True)
+
+df = pd.read_pickle("sleep_imu_data/sleep_data.pkl")
+acc = df[["acc_x", "acc_y", "acc_z"]]
+sampling_rate = 1.0 / pd.Series(df.index).diff().dt.total_seconds().median()
+
+print("Running/confirming BioPsyKit acceleration sleep pipeline")
+print("Samples:", len(acc), "sampling_rate:", sampling_rate)
+print("Recording:", df.index[0], "to", df.index[-1])
+
+result = predict_pipeline_acceleration(
+    acc,
+    sampling_rate=sampling_rate,
+    convert_to_g=True,
+    algorithm_type="cole_kripke",
+    epoch_length=60,
+)
+endpoints = result["sleep_endpoints"]
+pred = {
+    "sleep_onset": endpoints["sleep_onset"],
+    "wake_onset": endpoints["wake_onset"],
+    "total_sleep_duration": endpoints["total_sleep_duration"],
+}
+
+out_path.write_text(json.dumps(pred, indent=2))
+print("Saved:", out_path)
+print(out_path.read_text())
 [OBS t44 step 5 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Running/confirming BioPsyKit acceleration sleep pipeline | Samples: 4048332 sampling_rate: 204.79213598197828 | Recording: 2019-09-03 02:06:18.251953+02:00 to 2019-09-03 07:35:45.493164+02:00 | Saved: pred_results/imu_pred.json | { |   "sleep_onset": "2019-09-03 02:07:18+02:00", |   "wake_onset": "2019-09-03 07:00:18+02:00", |   "total_sleep_duration": 311 | } |  | --- STDERR --- | Matplotlib created a temporary cache directory at /var/tmp/matplotlib-7ydd00c6 because the default path (/root/.config/matplotlib) is not a writable directory; it is highly recommended to set the MPLCONFIGDIR environment variable to a writable directory, in particular to speed up the import of Matplotlib and to better support multiprocessing. | /root/.local/share/mamba/envs/testbed/lib/python3.10/site-packages/biopsykit/sleep/sleep_endpoints/sleep_endpoints.py:69: FutureWarning: Series.__getitem__ treating keys as positions is deprecated. In a future version, integer keys will always be treated as labels (consistent with DataFrame behavior). To access a value by position, use `ser.iloc[pos]` |   wake_after_sleep_onset = len(df_sw_sleep) - int(df_sw_sleep.sum()[0]) |
 
 ===== POINT 20/38: t45s1@1791613957-319021 =====
 [TASK-DESC] Given the questionnaire data, compute perceived stress scale (PSS) score. The results should be stored as a csv file "pred_results/questionnaire_pred.csv", where the columns are subject of the data item, perceived helplessness, perceived self-efficacy, and the total PSS score, respectively, but do not save the header.
-[STEP-CODE t45 step 1] (10 chars)
-step_01.py
+[STEP-CODE t45 step 1] (2482 chars)
+#!/usr/bin/env python3
+import os
+import pickle
+from pathlib import Path
+
+import pandas as pd
+
+DATA_PATH = Path("biopsykit_questionnaire_data/questionnaire_data.pkl")
+OUT_PATH = Path("pred_results/questionnaire_pred.csv")
+
+def load_dataframe(path: Path) -> pd.DataFrame:
+    obj = pd.read_pickle(path)
+    if isinstance(obj, pd.DataFrame):
+        return obj.copy()
+    # fallback in case pickle contains another object convertible to DataFrame
+    return pd.DataFrame(obj)
+
+def main():
+    df = load_dataframe(DATA_PATH)
+    print("Loaded:", DATA_PATH)
+    print("Shape:", df.shape)
+    print("Columns first 15:", list(df.columns[:15]))
+    print("Index name:", df.index.name)
+
+    # Ensure subject is available as a column.
+    if "subject" not in df.columns:
+        if df.index.name == "subject" or df.index.dtype == object:
+            df = df.reset_index()
+            if "index" in df.columns and "subject" not in df.columns:
+                df = df.rename(columns={"index": "subject"})
+        else:
+            raise ValueError("Could not find subject column or suitable subject index.")
+
+    pss_cols = [f"PSS_{i:02d}" for i in range(1, 11)]
+    missing = [c for c in pss_cols if c not in df.columns]
+    if missing:
+        raise ValueError(f"Missing PSS columns: {missing}")
+
+    pss = df[pss_cols].apply(pd.to_numeric)
+
+    # PSS-10 scoring:
+    # Negatively phrased/helplessness items: 1,2,3,6,9,10 scored directly.
+    # Positively phrased/self-efficacy items: 4,5,7,8 reverse scored on 0..4 as 4 - response.
+    helpless_cols = ["PSS_01", "PSS_02", "PSS_03", "PSS_06", "PSS_09", "PSS_10"]
+    selfeff_cols = ["PSS_04", "PSS_05", "PSS_07", "PSS_08"]
+
+    perceived_helplessness = pss[helpless_cols].sum(axis=1)
+    perceived_self_efficacy = (4 - pss[selfeff_cols]).sum(axis=1)
+    total_pss = perceived_helplessness + perceived_self_efficacy
+
+    out = pd.DataFrame({
+        "subject": df["subject"],
+        "perceived_helplessness": perceived_helplessness.astype(int),
+        "perceived_self_efficacy": perceived_self_efficacy.astype(int),
+        "total_pss": total_pss.astype(int),
+    })
+
+    OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    out.to_csv(OUT_PATH, index=False, header=False)
+
+    print("PSS response min/max:", int(pss.min().min()), int(pss.max().max()))
+    print("Output shape:", out.shape)
+    print("First 5 output rows:")
+    print(out.head().to_string(index=False))
+    print("Saved:", OUT_PATH)
+
+if __name__ == "__main__":
+    main()
 [OBS t45 step 1 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Loaded: biopsykit_questionnaire_data/questionnaire_data.pkl | Shape: (13, 66) | Columns first 15: ['PSS_01', 'PSS_02', 'PSS_03', 'PSS_04', 'PSS_05', 'PSS_06', 'PSS_07', 'PSS_08', 'PSS_09', 'PSS_10', 'PANAS_01_Pre', 'PANAS_02_Pre', 'PANAS_03_Pre', 'PANAS_04_Pre', 'PANAS_05_Pre'] | Index name: subject | PSS response min/max: 0 4 | Output shape: (13, 4) | First 5 output rows: | subject  perceived_helplessness  perceived_self_efficacy  total_pss |    Vp01                      14                        7         21 |    Vp02                       5                        5         10 |    Vp03                      14                       10         24 |    Vp04                      11                        6         17 |    Vp05                       8                        5         13 | Saved: pred_results/questionnaire_pred.csv |  | --- STDERR --- |
 
 ===== POINT 21/38: t5s1@1791614495-343084 =====
 [TASK-DESC] Use the DKPES dataset to develop a Random Forest classifier predicting signal inhibition of chemicals while choosing appropriate threshold to assign binary labels based on signal inhibition values. Save the test set predictions, including the index and predicted signal inhibition, in "pred_results/dkpes_test_pred.csv".
-[STEP-CODE t5 step 1] (10 chars)
-step_01.py
+[STEP-CODE t5 step 1] (8668 chars)
+#!/usr/bin/env python3
+import os
+import json
+import warnings
+warnings.filterwarnings("ignore")
+
+import numpy as np
+import pandas as pd
+
+from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import balanced_accuracy_score, f1_score, roc_auc_score, average_precision_score
+from sklearn.model_selection import StratifiedKFold, cross_val_predict
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder
+
+
+RANDOM_STATE = 42
+TRAIN_PATH = "dkpes/dkpes_train.csv"
+TEST_PATH = "dkpes/dkpes_test.csv"
+OUT_DIR = "pred_results"
+OUT_PATH = os.path.join(OUT_DIR, "dkpes_test_pred.csv")
+
+
+def otsu_threshold(values, bins=256):
+    """Otsu threshold for a 1D continuous target."""
+    values = np.asarray(values, dtype=float)
+    values = values[np.isfinite(values)]
+    if len(values) < 2:
+        return float(np.nanmedian(values))
+    counts, edges = np.histogram(values, bins=min(bins, max(2, len(np.unique(values)))))
+    centers = (edges[:-1] + edges[1:]) / 2.0
+    total = counts.sum()
+    if total == 0:
+        return float(np.nanmedian(values))
+
+    weight1 = np.cumsum(counts)
+    weight2 = total - weight1
+    mean1_num = np.cumsum(counts * centers)
+    mean_total = mean1_num[-1]
+    valid = (weight1 > 0) & (weight2 > 0)
+
+    mean1 = np.zeros_like(centers)
+    mean2 = np.zeros_like(centers)
+    mean1[valid] = mean1_num[valid] / weight1[valid]
+    mean2[valid] = (mean_total - mean1_num[valid]) / weight2[valid]
+
+    between = weight1 * weight2 * (mean1 - mean2) ** 2
+    between[~valid] = -np.inf
+    return float(centers[int(np.argmax(between))])
+
+
+def make_ohe():
+    # compatibility with older/newer sklearn
+    try:
+        return OneHotEncoder(handle_unknown="ignore", sparse_output=False)
+    except TypeError:
+        return OneHotEncoder(handle_unknown="ignore", sparse=False)
+
+
+def build_pipeline(feature_df):
+    categorical_cols = feature_df.select_dtypes(include=["object", "category"]).columns.tolist()
+    numeric_cols = [c for c in feature_df.columns if c not in categorical_cols]
+
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ("num", "passthrough", numeric_cols),
+            ("cat", make_ohe(), categorical_cols),
+        ],
+        remainder="drop",
+    )
+
+    clf = RandomForestClassifier(
+        n_estimators=700,
+        max_features="sqrt",
+        min_samples_leaf=2,
+        class_weight="balanced_subsample",
+        random_state=RANDOM_STATE,
+        n_jobs=-1,
+    )
+
+    return Pipeline([("preprocess", preprocessor), ("rf", clf)]), numeric_cols, categorical_cols
+
+
+def main():
+    print("Loading data...")
+    train = pd.read_csv(TRAIN_PATH)
+    test = pd.read_csv(TEST_PATH)
+
+    print(f"Train shape: {train.shape}")
+    print(f"Test shape:  {test.shape}")
+    print(f"Train columns: {list(train.columns)}")
+    print(f"Test columns:  {list(test.columns)}")
+
+    id_col = "index"
+    target_col = "Signal-inhibition"
+    if id_col not in train.columns or target_col not in train.columns:
+        raise ValueError("Expected train columns 'index' and 'Signal-inhibition' were not found.")
+    if id_col not in test.columns:
+        raise ValueError("Expected test column 'index' was not found.")
+
+    y_cont = train[target_col].astype(float).to_numpy()
+    print("\nSignal-inhibition summary:")
+    print(train[target_col].describe(percentiles=[0.05, 0.10, 0.25, 0.50, 0.75, 0.90, 0.95]).to_string())
+
+    feature_cols = [c for c in train.columns if c not in [id_col, target_col]]
+    X = train[feature_cols].copy()
+    X_test = test[feature_cols].copy()
+
+    pipe_probe, num_cols, cat_cols = build_pipeline(X)
+    print(f"\nNumeric feature count: {len(num_cols)}")
+    print(f"Categorical feature count: {len(cat_cols)}")
+    if cat_cols:
+        print(f"Categorical features: {cat_cols}")
+
+    # Candidate thresholds include the natural 0.50 cutoff, quartiles/deciles, and an unsupervised Otsu split.
+    otsu = otsu_threshold(y_cont)
+    candidate_thresholds = sorted(set(
+        [0.50, otsu] +
+        [float(np.quantile(y_cont, q)) for q in [0.25, 0.33, 0.40, 0.50, 0.60, 0.67, 0.75]]
+    ))
+
+    # Keep only thresholds that create two sufficiently populated classes.
+    candidate_thresholds = [
+        t for t in candidate_thresholds
+        if 0 < np.sum(y_cont >= t) < len(y_cont)
+        and min(np.mean(y_cont >= t), 1 - np.mean(y_cont >= t)) >= 0.05
+    ]
+
+    print("\nEvaluating candidate label thresholds with out-of-fold Random Forest probabilities...")
+    rows = []
+    cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
+
+    for threshold in candidate_thresholds:
+        y_bin = (y_cont >= threshold).astype(int)
+        positive_rate = float(y_bin.mean())
+
+        model, _, _ = build_pipeline(X)
+        proba = cross_val_predict(
+            model,
+            X,
+            y_bin,
+            cv=cv,
+            method="predict_proba",
+            n_jobs=-1,
+        )[:, 1]
+        pred = (proba >= 0.5).astype(int)
+
+        try:
+            auc = float(roc_auc_score(y_bin, proba))
+        except Exception:
+            auc = float("nan")
+        try:
+            ap = float(average_precision_score(y_bin, proba))
+        except Exception:
+            ap = float("nan")
+
+        rows.append({
+            "threshold": float(threshold),
+            "positive_rate": positive_rate,
+            "balanced_accuracy": float(balanced_accuracy_score(y_bin, pred)),
+            "f1": float(f1_score(y_bin, pred, zero_division=0)),
+            "roc_auc": auc,
+            "average_precision": ap,
+        })
+
+    scores = pd.DataFrame(rows).sort_values(
+        ["balanced_accuracy", "roc_auc", "f1"],
+        ascending=False,
+    ).reset_index(drop=True)
+
+    print(scores.to_string(index=False, float_format=lambda x: f"{x:.4f}"))
+
+    # Select a data-supported threshold.  Prefer high balanced accuracy; ties favor a threshold
+    # close to the domain-natural 0.50 split for interpretability of inhibition probability.
+    best_bal = scores["balanced_accuracy"].max()
+    near_best = scores[scores["balanced_accuracy"] >= best_bal - 0.01].copy()
+    near_best["distance_to_0p5"] = (near_best["threshold"] - 0.50).abs()
+    chosen = near_best.sort_values(["distance_to_0p5", "roc_auc"], ascending=[True, False]).iloc[0]
+    threshold = float(chosen["threshold"])
+
+    print("\nChosen binary-label threshold:")
+    print(json.dumps({
+        "threshold": threshold,
+        "positive_definition": f"{target_col} >= {threshold:.6g}",
+        "training_positive_rate": float(np.mean(y_cont >= threshold)),
+        "selection_balanced_accuracy": float(chosen["balanced_accuracy"]),
+        "selection_roc_auc": float(chosen["roc_auc"]),
+        "selection_f1": float(chosen["f1"]),
+    }, indent=2))
+
+    y_bin = (y_cont >= threshold).astype(int)
+    final_model, _, _ = build_pipeline(X)
+    final_model.fit(X, y_bin)
+
+    test_prob = final_model.predict_proba(X_test)[:, 1]
+    pred_df = pd.DataFrame({
+        "index": test[id_col].astype(str),
+        "predicted_signal_inhibition": test_prob,
+    })
+
+    os.makedirs(OUT_DIR, exist_ok=True)
+    pred_df.to_csv(OUT_PATH, index=False)
+
+    # Save a compact metadata/audit file as well.
+    meta_path = os.path.join(OUT_DIR, "dkpes_model_metadata.json")
+    metadata = {
+        "model": "RandomForestClassifier",
+        "target_source": target_col,
+        "binary_threshold": threshold,
+        "positive_label_rule": f"{target_col} >= {threshold:.6g}",
+        "n_train": int(len(train)),
+        "n_test": int(len(test)),
+        "feature_columns": feature_cols,
+        "numeric_feature_count": int(len(num_cols)),
+        "categorical_feature_count": int(len(cat_cols)),
+        "categorical_features": cat_cols,
+        "chosen_cv_metrics": {
+            "balanced_accuracy": float(chosen["balanced_accuracy"]),
+            "roc_auc": float(chosen["roc_auc"]),
+            "f1": float(chosen["f1"]),
+            "average_precision": float(chosen["average_precision"]),
+        },
+        "output_prediction_column": "predicted_signal_inhibition",
+        "output_prediction_meaning": "Random Forest predicted probability of the high signal-inhibition class",
+    }
+    with open(meta_path, "w") as f:
+        json.dump(metadata, f, indent=2)
+
+    print(f"\nSaved predictions to: {OUT_PATH}")
+    print(f"Saved metadata to:    {meta_path}")
+    print("\nPrediction preview:")
+    print(pred_df.head(10).to_string(index=False))
+    print("\nPrediction summary:")
+    print(pred_df["predicted_signal_inhibition"].describe(percentiles=[0.05, 0.25, 0.50, 0.75, 0.95]).to_string())
+
+
+if __name__ == "__main__":
+    main()
 [OBS t5 step 1 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Loading data... | Train shape: (44, 27) | Test shape:  (12, 27) | Train columns: ['index', 'Signal-inhibition', '3-Keto', '3-Hydroxy', '12-Keto', '12-Hydroxy', '19-Methyl', '18-Methyl', 'Sulfate-Ester', 'Sulfate-Oxygens', 'C4-C5-DB', 'C6-C7-DB', 'Sulfur', 'ShapeQuery', 'TanimotoCombo', 'ShapeTanimoto', 'ColorTanimoto', 'FitTverskyCombo', 'FitTversky', 'FitColorTversky', 'RefTverskyCombo', 'RefTversky', 'RefColorTversky', 'ScaledColor', 'ComboScore', 'ColorScore', 'Overlap'] | Test columns:  ['index', 'Signal-inhibition', '3-Keto', '3-Hydroxy', '12-Keto', '12-Hydroxy', '19-Methyl', '18-Methyl', 'Sulfate-Ester', 'Sulfate-Oxygens', 'C4-C5-DB', 'C6-C7-DB', 'Sulfur', 'ShapeQuery', 'TanimotoCombo', 'ShapeTanimoto', 'ColorTanimoto', 'FitTverskyCombo', 'FitTversky', 'FitColorTversky', 'RefTverskyCombo', 'RefTversky', 'RefColorTversky', 'ScaledColor', 'ComboScore', 'ColorScore', 'Overlap'] |  | Signal-inhibition summary: | count    44.000000 | mean      0.357045 | std       0.237409 | min       0.000000 | 5%        0.034650 | 10%       0.116400 | 25%       0.186000 | 50%       0.284000 | 75%       0.485000 | 90%       0.711200 | 95%       0.829100 | max       ... [TRUNCATED]
 
 ===== POINT 22/38: t5s2@1791613243-300389 =====
 [TASK-DESC] Use the DKPES dataset to develop a Random Forest classifier predicting signal inhibition of chemicals while choosing appropriate threshold to assign binary labels based on signal inhibition values. Save the test set predictions, including the index and predicted signal inhibition, in "pred_results/dkpes_test_pred.csv".
-[STEP-CODE t5 step 2] (10 chars)
-step_02.py
+[STEP-CODE t5 step 2] (6374 chars)
+#!/usr/bin/env python3
+import os
+import json
+import numpy as np
+import pandas as pd
+
+from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import balanced_accuracy_score, accuracy_score, f1_score, roc_auc_score, mean_absolute_error
+from sklearn.model_selection import StratifiedKFold, LeaveOneOut, cross_val_predict
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder
+
+RANDOM_STATE = 42
+
+train = pd.read_csv("dkpes/dkpes_train.csv")
+test = pd.read_csv("dkpes/dkpes_test.csv")
+
+print("Train shape:", train.shape, "Test shape:", test.shape)
+print("Signal-inhibition sorted:")
+print(np.array2string(np.sort(train["Signal-inhibition"].values), precision=3, separator=", "))
+
+feature_cols = [c for c in train.columns if c not in ["index", "Signal-inhibition"]]
+X = train[feature_cols]
+y_cont = train["Signal-inhibition"].astype(float).values
+
+cat_cols = X.select_dtypes(include=["object", "category"]).columns.tolist()
+num_cols = [c for c in feature_cols if c not in cat_cols]
+print("Categorical columns:", cat_cols)
+print("Numeric columns:", len(num_cols), num_cols)
+
+# Compatible OneHotEncoder argument across sklearn versions
+try:
+    ohe = OneHotEncoder(handle_unknown="ignore", sparse_output=False)
+except TypeError:
+    ohe = OneHotEncoder(handle_unknown="ignore", sparse=False)
+
+preprocess = ColumnTransformer(
+    transformers=[
+        ("num", SimpleImputer(strategy="median"), num_cols),
+        ("cat", Pipeline([("imp", SimpleImputer(strategy="most_frequent")), ("ohe", ohe)]), cat_cols),
+    ],
+    remainder="drop",
+)
+
+def make_clf():
+    return Pipeline([
+        ("prep", preprocess),
+        ("rf", RandomForestClassifier(
+            n_estimators=1000,
+            random_state=RANDOM_STATE,
+            class_weight="balanced",
+            min_samples_leaf=1,
+            max_features="sqrt",
+            n_jobs=-1,
+        )),
+    ])
+
+# Evaluate plausible thresholds. Need both classes with enough members for stratified CV.
+candidate_thresholds = sorted(set(
+    [0.40, 0.45, 0.50, 0.55, 0.60, float(np.median(y_cont))] +
+    [float(q) for q in np.quantile(y_cont, [0.25, 0.33, 0.5, 0.67, 0.75])]
+))
+rows = []
+for thr in candidate_thresholds:
+    y_bin = (y_cont >= thr).astype(int)
+    n_pos = int(y_bin.sum())
+    n_neg = int(len(y_bin) - n_pos)
+    if n_pos < 3 or n_neg < 3:
+        continue
+    n_splits = min(5, n_pos, n_neg)
+    cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=RANDOM_STATE)
+    try:
+        pred = cross_val_predict(make_clf(), X, y_bin, cv=cv, method="predict")
+        proba = cross_val_predict(make_clf(), X, y_bin, cv=cv, method="predict_proba")[:, 1]
+        bal = balanced_accuracy_score(y_bin, pred)
+        acc = accuracy_score(y_bin, pred)
+        f1 = f1_score(y_bin, pred, zero_division=0)
+        auc = roc_auc_score(y_bin, proba) if len(np.unique(y_bin)) == 2 else np.nan
+        rows.append({
+            "threshold": thr, "n_pos": n_pos, "n_neg": n_neg,
+            "cv_splits": n_splits, "balanced_accuracy": bal,
+            "accuracy": acc, "f1": f1, "roc_auc": auc
+        })
+    except Exception as e:
+        rows.append({"threshold": thr, "n_pos": n_pos, "n_neg": n_neg, "error": str(e)})
+
+eval_df = pd.DataFrame(rows).sort_values(
+    ["balanced_accuracy", "f1", "accuracy"], ascending=False, na_position="last"
+)
+print("\nThreshold CV evaluation:")
+print(eval_df.to_string(index=False))
+
+# Choose threshold: primary criterion is balanced accuracy, but prefer interpretable/biologically common 0.5
+# if it is within a small tolerance of the best. This avoids choosing an arbitrary tiny-data split.
+best_thr = float(eval_df.iloc[0]["threshold"])
+best_bal = float(eval_df.iloc[0]["balanced_accuracy"])
+thr_05_rows = eval_df[np.isclose(eval_df["threshold"], 0.50)]
+if not thr_05_rows.empty:
+    bal_05 = float(thr_05_rows.iloc[0]["balanced_accuracy"])
+    if bal_05 >= best_bal - 0.05:
+        chosen_thr = 0.50
+        reason = f"0.50 selected because CV balanced accuracy {bal_05:.3f} is within 0.05 of best {best_bal:.3f}"
+    else:
+        chosen_thr = best_thr
+        reason = f"best CV threshold selected ({best_bal:.3f} balanced accuracy)"
+else:
+    chosen_thr = best_thr
+    reason = "0.50 unavailable; best CV threshold selected"
+
+print("\nChosen threshold:", chosen_thr, "|", reason)
+y_bin = (y_cont >= chosen_thr).astype(int)
+print("Class counts at chosen threshold:", dict(zip(*np.unique(y_bin, return_counts=True))))
+
+# Also fit a regressor as a sanity check for predicted continuous inhibition, but final file will contain classifier labels.
+reg = Pipeline([
+    ("prep", preprocess),
+    ("rf", RandomForestRegressor(
+        n_estimators=1000,
+        random_state=RANDOM_STATE,
+        min_samples_leaf=1,
+        max_features="sqrt",
+        n_jobs=-1,
+    )),
+])
+loo = LeaveOneOut()
+reg_pred = cross_val_predict(reg, X, y_cont, cv=loo, method="predict")
+print("\nLOOCV regressor MAE for reference:", mean_absolute_error(y_cont, reg_pred))
+print("Regressor prediction range in CV:", float(reg_pred.min()), float(reg_pred.max()))
+
+# Fit final classifier and predict test binary signal inhibition.
+clf = make_clf()
+clf.fit(X, y_bin)
+X_test = test[feature_cols]
+test_pred = clf.predict(X_test).astype(int)
+test_proba = clf.predict_proba(X_test)[:, 1]
+
+# Save required predictions. Use target-like column name for compatibility; include probability as extra information.
+os.makedirs("pred_results", exist_ok=True)
+out = pd.DataFrame({
+    "index": test["index"].values,
+    "Signal-inhibition": test_pred,
+    "predicted_probability_active": test_proba,
+})
+out_path = "pred_results/dkpes_test_pred.csv"
+out.to_csv(out_path, index=False)
+
+# Save metadata/evaluation for reproducibility.
+meta = {
+    "chosen_threshold": chosen_thr,
+    "threshold_reason": reason,
+    "positive_label_definition": f"Signal-inhibition >= {chosen_thr}",
+    "features": feature_cols,
+    "categorical_features": cat_cols,
+    "numeric_features": num_cols,
+    "threshold_cv": eval_df.to_dict(orient="records"),
+}
+with open("pred_results/dkpes_model_metadata.json", "w") as f:
+    json.dump(meta, f, indent=2)
+
+print("\nSaved:", out_path)
+print(out.to_string(index=False))
+print("\nSaved metadata: pred_results/dkpes_model_metadata.json")
 [OBS t5 step 2 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Train shape: (44, 27) Test shape: (12, 27) | Signal-inhibition sorted: | [0.   , 0.032, 0.033, 0.044, 0.108, 0.136, 0.158, 0.17 , 0.174, 0.183, |  0.186, 0.186, 0.195, 0.209, 0.213, 0.226, 0.237, 0.24 , 0.263, 0.269, |  0.278, 0.28 , 0.288, 0.297, 0.318, 0.334, 0.354, 0.365, 0.399, 0.414, |  0.483, 0.484, 0.484, 0.488, 0.515, 0.623, 0.624, 0.627, 0.686, 0.722, |  0.739, 0.845, 0.897, 0.904] | Categorical columns: ['ShapeQuery'] | Numeric columns: 24 ['3-Keto', '3-Hydroxy', '12-Keto', '12-Hydroxy', '19-Methyl', '18-Methyl', 'Sulfate-Ester', 'Sulfate-Oxygens', 'C4-C5-DB', 'C6-C7-DB', 'Sulfur', 'TanimotoCombo', 'ShapeTanimoto', 'ColorTanimoto', 'FitTverskyCombo', 'FitTversky', 'FitColorTversky', 'RefTverskyCombo', 'RefTversky', 'RefColorTversky', 'ScaledColor', 'ComboScore', 'ColorScore', 'Overlap'] |  | Threshold CV evaluation: |  threshold  n_pos  n_neg  cv_splits  balanced_accuracy  accuracy       f1  roc_auc |    0.48500     11     33          5           0.863636  0.931818 0.842105 0.849862 |    0.45000     14     30          5           0.788095  0.840909 0.720000 0.873810 |    0.50000     10     34          5           0.720588  0.840909 0.588235 ... [TRUNCATED]
 
 ===== POINT 23/38: t53s1@1791612802-278586 =====
 [TASK-DESC] Standardize land cover and protected status datasets for consistency in analysis for mountain lion habitat. Reclassify these categorical datasets to a common scale using geospatial tools. Save the reclassified data as pred_results/landCover_reclassified.tif and pred_results/protected_status_reclassified.tif.
-[STEP-CODE t53 step 1] (10 chars)
-step_01.py
+[STEP-CODE t53 step 1] (5669 chars)
+#!/usr/bin/env python3
+"""
+Reclassify land cover and protected status rasters to a common 1-10 scale.
+
+Outputs:
+  pred_results/landCover_reclassified.tif
+  pred_results/protected_status_reclassified.tif
+"""
+
+from pathlib import Path
+import sys
+import numpy as np
+
+try:
+    import rasterio
+except Exception as e:
+    print("ERROR: rasterio is required but could not be imported:", repr(e))
+    sys.exit(1)
+
+
+DATA_DIR = Path("MountainLionNew")
+OUT_DIR = Path("pred_results")
+OUT_DIR.mkdir(parents=True, exist_ok=True)
+
+LAND_SRC = DATA_DIR / "landCover.tif"
+PROT_SRC = DATA_DIR / "Protected_Status.tif"
+
+LAND_OUT = OUT_DIR / "landCover_reclassified.tif"
+PROT_OUT = OUT_DIR / "protected_status_reclassified.tif"
+
+landCover_classification = {
+    11: 10,  # Open Water
+    21: 8,   # Developed, Open Space
+    22: 7,   # Developed, Low Intensity
+    23: 8,   # Developed, Medium Intensity
+    24: 9,   # Developed, High Intensity
+    31: 6,   # Barren Land
+    41: 2,   # Deciduous Forest
+    42: 1,   # Evergreen Forest
+    43: 2,   # Mixed Forest
+    52: 3,   # Shrub/Scrub
+    71: 3,   # Grassland/Herbaceous
+    72: 3,   # Sedge/Herbaceous
+    81: 4,   # Hay/Pasture
+    82: 6,   # Cultivated Crops
+    90: 4,   # Woody Wetlands
+    95: 4,   # Emergent Herbaceous Wetlands
+    255: 10
+}
+
+protected_status_classification = {
+    0: 1,
+    1: 3,
+    2: 6,
+    3: 9,
+    4: 10,
+    255: 10
+}
+
+
+def bincount_raster_values(path):
+    """Return dict of value counts for a single-band integer raster."""
+    counts = {}
+    with rasterio.open(path) as src:
+        for _, window in src.block_windows(1):
+            arr = src.read(1, window=window, masked=False)
+            vals, cnts = np.unique(arr, return_counts=True)
+            for v, c in zip(vals.tolist(), cnts.tolist()):
+                counts[int(v)] = counts.get(int(v), 0) + int(c)
+    return dict(sorted(counts.items()))
+
+
+def reclassify_raster(src_path, out_path, mapping, default_value=0):
+    """
+    Reclassify a uint/integer categorical raster using an explicit value mapping.
+    Unmapped values are written as default_value, used here as NoData/unknown.
+    """
+    if not src_path.exists():
+        raise FileNotFoundError(f"Missing source raster: {src_path}")
+
+    # Make a lookup table for the common uint8 categorical rasters.
+    lut = np.full(256, default_value, dtype=np.uint8)
+    for old, new in mapping.items():
+        if not (0 <= int(old) <= 255):
+            raise ValueError(f"Mapping key outside uint8 range: {old}")
+        if not (0 <= int(new) <= 255):
+            raise ValueError(f"Mapping value outside uint8 range: {new}")
+        lut[int(old)] = np.uint8(new)
+
+    src_counts = bincount_raster_values(src_path)
+    unmapped = sorted(v for v in src_counts if v not in mapping)
+
+    with rasterio.open(src_path) as src:
+        profile = src.profile.copy()
+        print(f"\nSource: {src_path}")
+        print(f"  size: {src.width} x {src.height}; dtype={src.dtypes[0]}; crs={src.crs}")
+        print(f"  transform: {src.transform}")
+        print(f"  source nodata: {src.nodata}")
+        print(f"  source unique counts: {src_counts}")
+        if unmapped:
+            print(f"  WARNING: unmapped source values will become {default_value}: {unmapped}")
+        else:
+            print("  all observed source values are explicitly mapped")
+
+        profile.update(
+            driver="GTiff",
+            dtype="uint8",
+            count=1,
+            nodata=default_value,
+            compress="lzw",
+            tiled=True,
+            BIGTIFF="IF_SAFER"
+        )
+
+        with rasterio.open(out_path, "w", **profile) as dst:
+            for _, window in src.block_windows(1):
+                arr = src.read(1, window=window, masked=False)
+
+                # Robust integer mapping. Inputs are expected uint8; this handles
+                # integer arrays with possible out-of-range values by defaulting.
+                if arr.dtype == np.uint8:
+                    out = lut[arr]
+                else:
+                    out = np.full(arr.shape, default_value, dtype=np.uint8)
+                    valid = (arr >= 0) & (arr <= 255)
+                    out[valid] = lut[arr[valid].astype(np.uint8)]
+
+                dst.write(out, 1, window=window)
+
+    out_counts = bincount_raster_values(out_path)
+    with rasterio.open(out_path) as chk:
+        print(f"Output: {out_path}")
+        print(f"  size: {chk.width} x {chk.height}; dtype={chk.dtypes[0]}; crs={chk.crs}")
+        print(f"  output nodata: {chk.nodata}")
+        print(f"  output unique counts: {out_counts}")
+
+    return out_counts
+
+
+def main():
+    print("Starting raster reclassification for mountain lion habitat predictors.")
+    print(f"Working directory outputs will be saved in: {OUT_DIR.resolve()}")
+
+    land_counts = reclassify_raster(
+        LAND_SRC,
+        LAND_OUT,
+        landCover_classification,
+        default_value=0
+    )
+
+    prot_counts = reclassify_raster(
+        PROT_SRC,
+        PROT_OUT,
+        protected_status_classification,
+        default_value=0
+    )
+
+    required_ok = LAND_OUT.exists() and LAND_OUT.stat().st_size > 0
+    prot_ok = PROT_OUT.exists() and PROT_OUT.stat().st_size > 0
+
+    print("\nReclassification complete.")
+    print(f"  Required output exists: {required_ok} -> {LAND_OUT}")
+    print(f"  Protected-status output exists: {prot_ok} -> {PROT_OUT}")
+    print(f"  landCover reclassified values: {sorted(land_counts.keys())}")
+    print(f"  protected status reclassified values: {sorted(prot_counts.keys())}")
+
+    if not required_ok:
+        raise RuntimeError(f"Required output was not created correctly: {LAND_OUT}")
+
+
+if __name__ == "__main__":
+    main()
 [OBS t53 step 1 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Starting raster reclassification for mountain lion habitat predictors. | Working directory outputs will be saved in: <WORKDIR> |  | Source: MountainLionNew/landCover.tif |   size: 3062 x 2494; dtype=uint8; crs=EPSG:26911 |   transform: | 30.00, 0.00, 307049.44| | | 0.00,-30.00, 3837890.35| | | 0.00, 0.00, 1.00| |   source nodata: None |   source unique counts: {0: 160768, 11: 34171, 21: 700756, 22: 641523, 23: 747095, 24: 176973, 31: 34345, 41: 409, 42: 311867, 43: 321842, 52: 3336782, 71: 712183, 81: 66112, 82: 200154, 90: 19262, 95: 14414, 255: 157972} |   WARNING: unmapped source values will become 0: [0] | Output: pred_results/landCover_reclassified.tif |   size: 3062 x 2494; dtype=uint8; crs=EPSG:26911 |   output nodata: 0.0 |   output unique counts: {0: 160768, 1: 311867, 2: 322251, 3: 4048965, 4: 99788, 6: 234499, 7: 641523, 8: 1447851, 9: 176973, 10: 192143} |  | Source: MountainLionNew/Protected_Status.tif |   size: 3062 x 2494; dtype=uint8; crs=EPSG:26911 |   transform: | 30.00, 0.00, 307049.44| | | 0.00,-30.00, 3837890.35| | | 0.00, 0.00, 1.00| |   source nodata: None |   source unique counts: {0: 721920, 1: 810037, 2: 354610, 3: 1770781,  ... [TRUNCATED]
 
 ===== POINT 24/38: t58s2@1791612832-278797 =====
 [TASK-DESC] Generate a CSV file 'individuals.csv' containing the number of persons whose best-fit model-rule combination aligns with the models and rules from a set of given predictions. Each row in the CSV should represent a model-rule combination with the format: "Model; Rule; Num persons". Save this CSV file in the pred_results/ directory.
-[STEP-CODE t58 step 2] (10 chars)
-step_02.py
+[STEP-CODE t58 step 2] (1503 chars)
+#!/usr/bin/env python3
+from pathlib import Path
+import pandas as pd
+import csv
+import os
+
+def show_file(path, max_chars=5000):
+    print(f"\n===== RAW {path} =====")
+    p = Path(path)
+    if not p.exists():
+        print("MISSING")
+        return
+    txt = p.read_text(errors="replace")
+    print(txt[:max_chars])
+    print(f"--- length {len(txt)} chars ---")
+
+show_file("nvc/ind_data_for_plot.csv", 10000)
+show_file("nvc/accuracies_data_for_plot.csv", 3000)
+show_file("nvc/valid_syllogisms.csv", 3000)
+
+# More compact CSV inspection for models
+for path in sorted(Path("nvc/scripts/indiv_table/models").glob("*.csv")):
+    print(f"\n===== RAW MODEL {path.name} =====")
+    print(path.read_text()[:2000])
+
+# Inspect full rule files compactly
+for path in sorted(Path("nvc/scripts/indiv_table/rules").glob("*.py")):
+    print(f"\n===== RULE {path.name} =====")
+    print(path.read_text())
+
+# Analyze Ragni dimensions, individuals counts and responses
+df = pd.read_csv("nvc/Ragni2016.csv")
+print("\n===== Ragni summary =====")
+print("shape", df.shape)
+print("n ids", df["id"].nunique(), "min rows per id", df.groupby("id").size().min(), "max", df.groupby("id").size().max())
+print("task count", df["task"].nunique())
+print("sequence range", df["sequence"].min(), df["sequence"].max())
+print("response counts top")
+print(df["response"].value_counts().head(20).to_string())
+print("first id tasks/responses")
+print(df[df.id == df.id.min()].head(64)[["id","sequence","task","response"]].to_string(index=False))
 [OBS t58 step 2 first 1200 chars]
 exit_code: 0 | --- STDOUT --- |  | ===== RAW nvc/ind_data_for_plot.csv ===== | Model;Rule;Num persons | PSYCOP;PartNeg;41 | PSYCOP;EmptyStart;43 | PSYCOP;FiguralRule;24 | PSYCOP;NegativityRule;49 | PSYCOP;ParticularityRule;49 | Matching;PartNeg;70 | Matching;EmptyStart;18 | Matching;FiguralRule;12 | Matching;NegativityRule;32 | Matching;ParticularityRule;17 | VerbalModels;PartNeg;56 | VerbalModels;EmptyStart;22 | VerbalModels;FiguralRule;16 | VerbalModels;NegativityRule;34 | VerbalModels;ParticularityRule;16 | MMT;PartNeg;63 | MMT;EmptyStart;18 | MMT;FiguralRule;11 | MMT;NegativityRule;33 | MMT;ParticularityRule;14 | Conversion;PartNeg;48 | Conversion;EmptyStart;28 | Conversion;FiguralRule;37 | Conversion;NegativityRule;58 | Conversion;ParticularityRule;58 | PHM;PartNeg;61 | PHM;EmptyStart;19 | PHM;FiguralRule;18 | PHM;NegativityRule;31 | PHM;ParticularityRule;14 | Atmosphere;PartNeg;62 | Atmosphere;EmptyStart;21 | Atmosphere;FiguralRule;12 | Atmosphere;NegativityRule;40 | Atmosphere;ParticularityRule;18 |  | --- length 871 chars --- |  | ===== RAW nvc/accuracies_data_for_plot.csv ===== | model,nvc,task,prediction,plain_prediction,truth,improvement,hit_model,hit_nvc | PSYCOP,PartNe ... [TRUNCATED]
 
 ===== POINT 25/38: t58s2@1791614139-321155 =====
 [TASK-DESC] Generate a CSV file 'individuals.csv' containing the number of persons whose best-fit model-rule combination aligns with the models and rules from a set of given predictions. Each row in the CSV should represent a model-rule combination with the format: "Model; Rule; Num persons". Save this CSV file in the pred_results/ directory.
-[STEP-CODE t58 step 2] (10 chars)
-step_02.py
+[STEP-CODE t58 step 2] (1490 chars)
+import os
+from pathlib import Path
+import pandas as pd
+
+# Print a more focused inspection to infer the intended computation.
+paths = [
+    Path("nvc/ind_data_for_plot.csv"),
+    Path("nvc/accuracies_data_for_plot.csv"),
+    Path("nvc/valid_syllogisms.csv"),
+]
+for p in paths:
+    print("\n==", p, "==")
+    df = pd.read_csv(p)
+    print("shape", df.shape)
+    print("columns", list(df.columns))
+    print(df.head(20).to_string(index=False))
+    print("dtypes", df.dtypes.to_dict())
+
+# Locate any scripts/notebooks that may have generated indiv_table.png or expected individuals.csv.
+print("\nPython/script files under nvc:")
+for p in sorted(Path("nvc").rglob("*")):
+    if p.suffix.lower() in [".py", ".R", ".ipynb", ".sh"]:
+        print(p)
+
+# Inspect all Python files in nvc/scripts except rule modules.
+for p in sorted(Path("nvc/scripts").rglob("*.py")):
+    if "/rules/" in str(p).replace("\\", "/"):
+        continue
+    print("\n== PY", p, "==")
+    txt = p.read_text(errors="replace")
+    print("\n".join(txt.splitlines()[:250]))
+
+# Show all model CSV contents fully (small files).
+for d in [Path("nvc/scripts/indiv_table/models"), Path("nvc/scripts/prediction_errors/models")]:
+    print("\nMODEL DIR", d)
+    for p in sorted(d.glob("*.csv")):
+        print("\n--", p.name, "--")
+        print(p.read_text())
+
+# Show rule files fully from indiv_table.
+for p in sorted(Path("nvc/scripts/indiv_table/rules").glob("*.py")):
+    print("\n== RULE", p.name, "==")
+    print(p.read_text())
 [OBS t58 step 2 first 1200 chars]
 exit_code: 0 | --- STDOUT --- |  | == nvc/ind_data_for_plot.csv == | shape (35, 1) | columns ['Model;Rule;Num persons'] |            Model;Rule;Num persons |                 PSYCOP;PartNeg;41 |              PSYCOP;EmptyStart;43 |             PSYCOP;FiguralRule;24 |          PSYCOP;NegativityRule;49 |       PSYCOP;ParticularityRule;49 |               Matching;PartNeg;70 |            Matching;EmptyStart;18 |           Matching;FiguralRule;12 |        Matching;NegativityRule;32 |     Matching;ParticularityRule;17 |           VerbalModels;PartNeg;56 |        VerbalModels;EmptyStart;22 |       VerbalModels;FiguralRule;16 |    VerbalModels;NegativityRule;34 | VerbalModels;ParticularityRule;16 |                    MMT;PartNeg;63 |                 MMT;EmptyStart;18 |                MMT;FiguralRule;11 |             MMT;NegativityRule;33 |          MMT;ParticularityRule;14 | dtypes {'Model;Rule;Num persons': dtype('O')} |  | == nvc/accuracies_data_for_plot.csv == | shape (2235, 9) | columns ['model', 'nvc', 'task', 'prediction', 'plain_prediction', 'truth', 'improvement', 'hit_model', 'hit_nvc'] |  model               nvc task      prediction plain_prediction truth  improvement  hit_model  h ... [TRUNCATED]
 
 ===== POINT 26/38: t60s2@1791614180-321913 =====
 [TASK-DESC] Evaluate the predictions made by various syllogistic reasoning models and NVC (No Valid Conclusion) rules against the MFA (most frequent answer) benchmark. The program should output a CSV file named accuracies.csv saved to pred_results/, detailing each model's predictions, the true answers, and the improvements achieved by the NVC rules.
-[STEP-CODE t60 step 2] (10 chars)
-step_02.py
+[STEP-CODE t60 step 2] (904 chars)
+#!/usr/bin/env python3
+import pandas as pd
+from pathlib import Path
+base=Path("nvc")
+
+pd.set_option("display.max_columns", 50)
+pd.set_option("display.width", 200)
+
+for rel in ["valid_syllogisms.csv","accuracies_data_for_plot.csv","ind_data_for_plot.csv"]:
+    df=pd.read_csv(base/rel)
+    print("\n==",rel,"==")
+    print("shape",df.shape)
+    print("columns",df.columns.tolist())
+    print(df.head(20).to_string(index=False))
+    print("tail")
+    print(df.tail(10).to_string(index=False))
+
+print("\n== all model csvs ==")
+for path in sorted((base/"scripts/indiv_table/models").glob("*.csv")):
+    df=pd.read_csv(path)
+    print("\n",path.name, df.shape, df.columns.tolist())
+    print(df.head(8).to_string(index=False))
+
+print("\n== rule source snippets ==")
+for path in sorted((base/"scripts/nvc_prediction/rules").glob("*.py")):
+    print("\n---", path.name, "---")
+    print(path.read_text()[:2500])
 [OBS t60 step 2 first 1200 chars]
 exit_code: 0 | --- STDOUT --- |  | == valid_syllogisms.csv == | shape (64, 2) | columns ['syllog', 'is_valid'] | syllog  is_valid |    AA1      True |    AA2      True |    AA3     False |    AA4      True |    AI1     False |    AI2      True |    AI3     False |    AI4      True |    AE1      True |    AE2      True |    AE3      True |    AE4      True |    AO1     False |    AO2     False |    AO3      True |    AO4      True |    IA1      True |    IA2     False |    IA3     False |    IA4      True | tail | syllog  is_valid |    OI3     False |    OI4     False |    OE1     False |    OE2     False |    OE3     False |    OE4     False |    OO1     False |    OO2     False |    OO3     False |    OO4     False |  | == accuracies_data_for_plot.csv == | shape (2235, 9) | columns ['model', 'nvc', 'task', 'prediction', 'plain_prediction', 'truth', 'improvement', 'hit_model', 'hit_nvc'] |  model               nvc task      prediction plain_prediction truth  improvement  hit_model  hit_nvc | PSYCOP           PartNeg  IA4 Iac;Ica;Oac;Oca  Iac;Ica;Oac;Oca   Ica         0.00   0.250000 0.250000 | PSYCOP        EmptyStart  IA4 Iac;Ica;Oac;Oca  Iac;Ica;Oac;Oca   Ica         0.00   0.250 ... [TRUNCATED]
 
 ===== POINT 27/38: t60s3@1791612902-279436 =====
 [TASK-DESC] Evaluate the predictions made by various syllogistic reasoning models and NVC (No Valid Conclusion) rules against the MFA (most frequent answer) benchmark. The program should output a CSV file named accuracies.csv saved to pred_results/, detailing each model's predictions, the true answers, and the improvements achieved by the NVC rules.
-[STEP-CODE t60 step 3] (10 chars)
-step_03.py
+[STEP-CODE t60 step 3] (3210 chars)
+#!/usr/bin/env python3
+import os, glob
+import pandas as pd
+
+pd.set_option("display.max_columns", 30)
+pd.set_option("display.width", 160)
+
+# Inspect compact facts needed to decide/reproduce output.
+acc = pd.read_csv("nvc/accuracies_data_for_plot.csv")
+print("Existing accuracies_data_for_plot:", acc.shape, list(acc.columns))
+print("Any missing values?\n", acc.isna().sum().to_string())
+print("Duplicate key rows model/nvc/task:", acc.duplicated(["model","nvc","task"]).sum())
+print("Rows not equal to full 7*5*64:", 7*5*64, "actual", len(acc))
+
+missing = []
+for m in sorted(acc.model.unique()):
+    for r in sorted(acc.nvc.unique()):
+        tasks = set(acc[(acc.model==m)&(acc.nvc==r)].task)
+        if len(tasks) != 64:
+            missing.append((m,r,64-len(tasks), sorted(set(acc.task.unique())-tasks)))
+print("Incomplete model/rule task sets:", missing)
+
+print("\nTruth count in existing file (unique per task):")
+truth_by_task = acc.groupby("task")["truth"].nunique()
+print("tasks with nonunique truth:", truth_by_task[truth_by_task != 1].to_dict())
+truth = acc.drop_duplicates("task")[["task","truth"]].sort_values("task")
+print(truth.head(20).to_string(index=False))
+print("truth value counts:\n", truth["truth"].value_counts().to_string())
+
+# Derive most frequent answers from participant data to compare.
+rag = pd.read_csv("nvc/Ragni2016.csv")
+print("\nRagni shape/cols:", rag.shape, list(rag.columns))
+print("unique sequences:", rag.sequence.nunique(), "unique ids:", rag.id.nunique())
+
+# Convert task text to syllogism code if possible.
+quant_map = {"All":"A", "Some":"I", "Some not":"O", "No":"E"}
+def premise_quant(p):
+    return quant_map[p.split(";")[0]]
+def figure_from_task(task):
+    p1, p2 = task.split("/")
+    _, s1, p1t = p1.split(";")
+    _, s2, p2t = p2.split(";")
+    # conclusion terms are the two non-middle terms. Determine figure by middle placement:
+    # figures with premises encoded as: 1 M-P/S-M, 2 P-M/S-M, 3 M-P/M-S, 4 P-M/M-S (using a,b,c terms convention)
+    terms = [s1,p1t,s2,p2t]
+    # middle is repeated term
+    middle = [x for x in set(terms) if terms.count(x)==2][0]
+    pos1 = "subj" if s1 == middle else "pred"
+    pos2 = "subj" if s2 == middle else "pred"
+    return {("subj","pred"):1, ("pred","pred"):2, ("subj","subj"):3, ("pred","subj"):4}[(pos1,pos2)]
+def task_code(task):
+    p1, p2 = task.split("/")
+    return premise_quant(p1) + premise_quant(p2) + str(figure_from_task(task))
+
+rag["task_code"] = rag["task"].map(task_code)
+print("task_code nunique:", rag.task_code.nunique())
+mfa = rag.groupby("task_code")["response"].agg(lambda s: s.value_counts().index[0]).reset_index(name="mfa_raw")
+print("MFA raw sample:")
+print(mfa.head(10).to_string(index=False))
+
+def raw_to_code(resp):
+    if resp == "NVC":
+        return "NVC"
+    parts = resp.split(";")
+    return quant_map[parts[0]] + "??"
+print("\nMFA raw counts top:\n", mfa["mfa_raw"].value_counts().head(20).to_string())
+
+# Model file compact preview only.
+print("\nModel files columns and first rows:")
+for fn in sorted(glob.glob("nvc/scripts/indiv_table/models/*.csv")):
+    df = pd.read_csv(fn)
+    print(os.path.basename(fn), df.shape, list(df.columns), "head:", df.head(3).to_dict("records"))
 [OBS t60 step 3 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Existing accuracies_data_for_plot: (2235, 9) ['model', 'nvc', 'task', 'prediction', 'plain_prediction', 'truth', 'improvement', 'hit_model', 'hit_nvc'] | Any missing values? |  model               0 | nvc                 0 | task                0 | prediction          0 | plain_prediction    0 | truth               0 | improvement         0 | hit_model           0 | hit_nvc             0 | Duplicate key rows model/nvc/task: 0 | Rows not equal to full 7*5*64: 2240 actual 2235 | Incomplete model/rule task sets: [('Atmosphere', 'FiguralRule', 1, ['AE1']), ('MMT', 'FiguralRule', 1, ['II2']), ('PSYCOP', 'NegativityRule', 1, ['AO4']), ('PSYCOP', 'ParticularityRule', 1, ['IO4']), ('VerbalModels', 'FiguralRule', 1, ['OI3'])] |  | Truth count in existing file (unique per task): | tasks with nonunique truth: {} | task truth |  AA1   Aac |  AA2   Aca |  AA3   NVC |  AA4   Aac |  AE1   Eac |  AE2   Eca |  AE3   Eac |  AE4   Eac |  AI1   Iac |  AI2   Ica |  AI3   Ica |  AI4   Iac |  AO1   Oac |  AO2   Oca |  AO3   Oca |  AO4   Oac |  EA1   Eac |  EA2   Eca |  EA3   Eac |  EA4   Eca | truth value counts: |  truth | NVC    29 | Oac     7 | Oca     7 | Eac     5 | I ... [TRUNCATED]
 
 ===== POINT 28/38: t60s4@1791614180-321913 =====
 [TASK-DESC] Evaluate the predictions made by various syllogistic reasoning models and NVC (No Valid Conclusion) rules against the MFA (most frequent answer) benchmark. The program should output a CSV file named accuracies.csv saved to pred_results/, detailing each model's predictions, the true answers, and the improvements achieved by the NVC rules.
-[STEP-CODE t60 step 4] (10 chars)
-step_04.py
+[STEP-CODE t60 step 4] (1297 chars)
+#!/usr/bin/env python3
+import pandas as pd
+from pathlib import Path
+from collections import Counter
+base=Path("nvc")
+rag=pd.read_csv(base/"Ragni2016.csv")
+print("Ragni shape",rag.shape)
+print("unique sequences",rag.sequence.nunique(), "minmax",rag.sequence.min(), rag.sequence.max())
+# Compute response frequencies per sequence/task
+freq=(rag.groupby(["sequence","task","response"]).size().reset_index(name="n")
+      .sort_values(["sequence","n","response"], ascending=[True,False,True]))
+mfa=freq.groupby(["sequence","task"]).head(3)
+print("\nTop responses per sequence first 20 groups:")
+for seq in range(0,20):
+    sub=mfa[mfa.sequence==seq]
+    print("\nSEQ",seq)
+    print(sub.to_string(index=False))
+
+# Existing truths keyed task codes
+acc=pd.read_csv(base/"accuracies_data_for_plot.csv")
+truth=acc[["task","truth"]].drop_duplicates().sort_values("task")
+print("\nExisting truth mapping:")
+print(truth.to_string(index=False))
+
+# Inspect ind_data_for_plot
+ind=pd.read_csv(base/"ind_data_for_plot.csv")
+print("\nind_data_for_plot:")
+print(ind.to_string(index=False))
+
+# model accuracy means in existing acc
+print("\nExisting mean accuracies by model/rule:")
+summary=acc.groupby(["model","nvc"])[["hit_model","hit_nvc","improvement"]].mean().reset_index()
+print(summary.to_string(index=False))
 [OBS t60 step 4 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Ragni shape (8896, 9) | unique sequences 64 minmax 0 63 |  | Top responses per sequence first 20 groups: |  | SEQ 0 |  sequence                                              task                     response  n |         0             All;managers;clerks/All;clerks;models          All;managers;models  3 |         0           All;typists;dancers/Some;boxers;typists          Some;boxers;dancers  2 |         0          All;packers;tutors/Some;butchers;packers         Some;butchers;tutors  2 |         0           All;actors;drillers/All;drillers;nurses            All;actors;nurses  1 |         0    All;architects;trainers/All;trainers;designers     All;architects;designers  1 |         0          All;artists;surfers/All;surfers;planners         All;artists;planners  1 |         0       All;auditors;painters/All;painters;cleaners        All;auditors;cleaners  1 |         0            All;brewers;porters/All;porters;judges           All;brewers;judges  1 |         0         All;secretaries;agents/All;agents;brokers      All;brokers;secretaries  1 |         0         All;sailors;potters/Some;chemists;sailors         All;chemists;potters  1 |         0        ... [TRUNCATED]
 
 ===== POINT 29/38: t60s6@1791612902-279436 =====
 [TASK-DESC] Evaluate the predictions made by various syllogistic reasoning models and NVC (No Valid Conclusion) rules against the MFA (most frequent answer) benchmark. The program should output a CSV file named accuracies.csv saved to pred_results/, detailing each model's predictions, the true answers, and the improvements achieved by the NVC rules.
-[STEP-CODE t60 step 6] (10 chars)
-step_06.py
+[STEP-CODE t60 step 6] (3082 chars)
+#!/usr/bin/env python3
+import os
+import pandas as pd
+
+pd.set_option("display.max_columns", 60)
+pd.set_option("display.width", 220)
+pd.set_option("display.max_rows", 120)
+
+rag = pd.read_csv("nvc/Ragni2016.csv")
+
+quant_map = {"All":"A", "Some":"I", "Some not":"O", "No":"E"}
+rev_quant = {v:k for k,v in quant_map.items()}
+
+def figure_from_task(task):
+    p1, p2 = task.split("/")
+    q1, s1, p1t = p1.split(";")
+    q2, s2, p2t = p2.split(";")
+    terms = [s1, p1t, s2, p2t]
+    middle_terms = [x for x in set(terms) if terms.count(x) == 2]
+    if len(middle_terms) != 1:
+        raise ValueError(("bad middle", task, middle_terms))
+    m = middle_terms[0]
+    pos1 = "subj" if s1 == m else "pred"
+    pos2 = "subj" if s2 == m else "pred"
+    return {("subj","pred"):1, ("pred","pred"):2, ("subj","subj"):3, ("pred","subj"):4}[(pos1,pos2)]
+
+def task_code(task):
+    p1, p2 = task.split("/")
+    return quant_map[p1.split(";")[0]] + quant_map[p2.split(";")[0]] + str(figure_from_task(task))
+
+def conclusion_terms_from_choices(choices):
+    opts = choices.split("|")
+    non_nvc = [o for o in opts if o != "NVC"]
+    first = non_nvc[0].split(";")
+    return first[1], first[2]  # a,c orientation as presented by code's ac
+
+def response_code(row):
+    r = row["response"]
+    if r == "NVC":
+        return "NVC"
+    parts = r.split(";")
+    if len(parts) != 3 or parts[0] not in quant_map:
+        return None
+    q = quant_map[parts[0]]
+    a, c = conclusion_terms_from_choices(row["choices"])
+    if parts[1] == a and parts[2] == c:
+        return q + "ac"
+    if parts[1] == c and parts[2] == a:
+        return q + "ca"
+    return "OTHER"
+
+rag["task_code"] = rag["task"].map(task_code)
+rag["resp_code"] = rag.apply(response_code, axis=1)
+
+print("Rows:", len(rag), "task_code nunique:", rag.task_code.nunique())
+print("resp_code counts:")
+print(rag["resp_code"].value_counts(dropna=False).to_string())
+
+print("\nPer task response-code counts and MFA:")
+rows = []
+for task, sub in rag.groupby("task_code"):
+    vc = sub["resp_code"].value_counts(dropna=False)
+    # Exclude OTHER? First print both incl and choice-only.
+    vc_choice = sub.loc[sub["resp_code"]!="OTHER", "resp_code"].value_counts()
+    rows.append({
+        "task": task,
+        "n": len(sub),
+        "OTHER": int(vc.get("OTHER", 0)),
+        "mfa_incl_other": vc.index[0],
+        "mfa_incl_other_n": int(vc.iloc[0]),
+        "mfa_choice": vc_choice.index[0] if len(vc_choice) else None,
+        "mfa_choice_n": int(vc_choice.iloc[0]) if len(vc_choice) else 0,
+        "counts_choice": "; ".join(f"{k}:{v}" for k,v in vc_choice.items())
+    })
+mfadf = pd.DataFrame(rows).sort_values("task")
+print(mfadf.to_string(index=False))
+
+print("\nCompare existing truth to MFA choice:")
+acc = pd.read_csv("nvc/accuracies_data_for_plot.csv")
+truth = acc.drop_duplicates("task")[["task","truth"]]
+cmp = truth.merge(mfadf[["task","mfa_choice","mfa_choice_n","OTHER"]], on="task")
+cmp["truth_eq_mfa"] = cmp.truth == cmp.mfa_choice
+print(cmp.to_string(index=False))
+print("truth==mfa count:", cmp.truth_eq_mfa.sum(), "/", len(cmp))
 [OBS t60 step 6 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Rows: 8896 task_code nunique: 64 | resp_code counts: | resp_code | NVC    2468 | Oac    1191 | Iac    1170 | Oca    1169 | Ica     936 | Eac     805 | Eca     675 | Aac     288 | Aca     194 |  | Per task response-code counts and MFA: | task   n  OTHER mfa_incl_other  mfa_incl_other_n mfa_choice  mfa_choice_n                                                        counts_choice |  AA1 139      0            Aca                81        Aca            81             Aca:81; Aac:33; Iac:8; Ica:6; NVC:6; Eca:2; Oca:2; Oac:1 |  AA2 139      0            NVC                61        NVC            61     NVC:61; Aac:42; Aca:15; Iac:9; Ica:5; Oac:3; Eac:2; Eca:1; Oca:1 |  AA3 139      0            Aac                53        Aac            53          Aac:53; NVC:28; Iac:23; Ica:16; Aca:14; Oac:3; Eac:1; Oca:1 |  AA4 139      0            Aac                96        Aac            96            Aac:96; Aca:13; Iac:11; NVC:7; Ica:5; Oac:3; Oca:3; Eca:1 |  AE1 139      0            Eca                57        Eca            57           Eca:57; NVC:30; Eac:29; Oac:13; Oca:7; Ica:1; Aca:1; Iac:1 |  AE2 139      0            Eac                56        Eac   ... [TRUNCATED]
 
 ===== POINT 30/38: t60s8@1791614180-321913 =====
 [TASK-DESC] Evaluate the predictions made by various syllogistic reasoning models and NVC (No Valid Conclusion) rules against the MFA (most frequent answer) benchmark. The program should output a CSV file named accuracies.csv saved to pred_results/, detailing each model's predictions, the true answers, and the improvements achieved by the NVC rules.
-[STEP-CODE t60 step 8] (10 chars)
-step_08.py
+[STEP-CODE t60 step 8] (5581 chars)
+#!/usr/bin/env python3
+from pathlib import Path
+from collections import Counter
+import pandas as pd
+
+BASE = Path("nvc")
+OUTDIR = Path("pred_results")
+OUTFILE = OUTDIR / "accuracies.csv"
+
+QUANT_TO_MOOD = {"All": "A", "Some": "I", "Some not": "O", "No": "E"}
+
+def parse_statement(stmt: str):
+    parts = stmt.split(";")
+    if len(parts) != 3:
+        raise ValueError(f"Cannot parse statement: {stmt!r}")
+    return parts[0], parts[1], parts[2]
+
+def response_code(resp: str, choices: str) -> str:
+    """Convert a natural-language response to compact syllogistic code, e.g. Aac."""
+    if resp == "NVC":
+        return "NVC"
+    q, subj, pred = parse_statement(resp)
+    first_non_nvc = next(c for c in choices.split("|") if c != "NVC")
+    _, a, c = parse_statement(first_non_nvc)
+    if subj == a and pred == c:
+        direction = "ac"
+    elif subj == c and pred == a:
+        direction = "ca"
+    else:
+        raise ValueError(f"Response terms not end terms: response={resp!r}, choices={choices!r}")
+    return QUANT_TO_MOOD[q] + direction
+
+def task_code(task: str, choices: str) -> str:
+    """Convert a natural-language task to compact syllogism code, e.g. AE3."""
+    p1, p2 = task.split("/")
+    q1, s1, p1_obj = parse_statement(p1)
+    q2, s2, p2_obj = parse_statement(p2)
+
+    first_non_nvc = next(c for c in choices.split("|") if c != "NVC")
+    _, a, c = parse_statement(first_non_nvc)
+    all_terms = [s1, p1_obj, s2, p2_obj]
+    middle = Counter([t for t in all_terms if t not in {a, c}]).most_common(1)[0][0]
+
+    # Standard figure encoding for these model tables:
+    # 1: a-m / m-c, 2: m-a / c-m, 3: a-m / c-m, 4: m-a / m-c
+    mid_pos_1 = "S" if s1 == middle else "P"
+    mid_pos_2 = "S" if s2 == middle else "P"
+    figure = {("P", "S"): "1", ("S", "P"): "2", ("P", "P"): "3", ("S", "S"): "4"}[(mid_pos_1, mid_pos_2)]
+    return QUANT_TO_MOOD[q1] + QUANT_TO_MOOD[q2] + figure
+
+def hit(prediction: str, truth: str) -> float:
+    """Accuracy credit. Multiple model predictions split credit equally."""
+    parts = str(prediction).split(";")
+    return (1.0 / len(parts)) if truth in parts else 0.0
+
+def nvc_rule_applies(rule_name: str, syllogism: str) -> bool:
+    m1, m2, fig = syllogism[0], syllogism[1], int(syllogism[2])
+    if rule_name == "PartNeg":
+        return m1 != "A" and m2 != "A"
+    if rule_name == "EmptyStart":
+        return (fig == 1 and m1 == "E") or (fig == 2 and m2 == "E")
+    if rule_name == "FiguralRule":
+        return fig in (3, 4)
+    if rule_name == "NegativityRule":
+        return m1 in ("E", "O") and m2 in ("E", "O")
+    if rule_name == "ParticularityRule":
+        return m1 in ("I", "O") and m2 in ("I", "O")
+    raise ValueError(f"Unknown NVC rule: {rule_name}")
+
+# Build MFA truth table from Ragni2016 participant responses.
+ragni = pd.read_csv(BASE / "Ragni2016.csv")
+ragni["task_code"] = [task_code(t, ch) for t, ch in zip(ragni["task"], ragni["choices"])]
+ragni["response_code"] = [response_code(r, ch) for r, ch in zip(ragni["response"], ragni["choices"])]
+
+freq = ragni.groupby(["task_code", "response_code"]).size().reset_index(name="n")
+truth_rows = []
+tie_rows = []
+for task, group in freq.groupby("task_code"):
+    max_n = group["n"].max()
+    winners = sorted(group.loc[group["n"] == max_n, "response_code"])
+    if len(winners) > 1:
+        tie_rows.append((task, max_n, winners))
+    # There are no ties in this data; sort makes behavior deterministic if ever needed.
+    truth_rows.append({"task": task, "truth": winners[0], "mfa_count": int(max_n)})
+truth_df = pd.DataFrame(truth_rows).sort_values("task")
+
+# Combine every model with every NVC rule.
+rules = ["PartNeg", "EmptyStart", "FiguralRule", "NegativityRule", "ParticularityRule"]
+rows = []
+model_dir = BASE / "scripts" / "indiv_table" / "models"
+for model_file in sorted(model_dir.glob("*.csv")):
+    model_name = model_file.stem
+    pred_df = pd.read_csv(model_file).rename(columns={"Syllogism": "task", "Prediction": "plain_prediction"})
+    merged = pred_df.merge(truth_df[["task", "truth"]], on="task", how="inner")
+    if len(merged) != 64:
+        raise RuntimeError(f"{model_name}: expected 64 syllogisms after merge, got {len(merged)}")
+    for _, r in merged.iterrows():
+        plain = r["plain_prediction"]
+        task = r["task"]
+        truth = r["truth"]
+        model_hit = hit(plain, truth)
+        for rule in rules:
+            prediction = "NVC" if nvc_rule_applies(rule, task) else plain
+            nvc_hit = hit(prediction, truth)
+            rows.append({
+                "model": model_name,
+                "nvc": rule,
+                "task": task,
+                "prediction": prediction,
+                "plain_prediction": plain,
+                "truth": truth,
+                "improvement": nvc_hit - model_hit,
+                "hit_model": model_hit,
+                "hit_nvc": nvc_hit,
+            })
+
+out = pd.DataFrame(rows)
+out = out.sort_values(["model", "task", "nvc"]).reset_index(drop=True)
+
+OUTDIR.mkdir(parents=True, exist_ok=True)
+out.to_csv(OUTFILE, index=False)
+
+print(f"Wrote {OUTFILE}")
+print("shape:", out.shape)
+print("MFA ties:", len(tie_rows), tie_rows[:5])
+print("models:", sorted(out["model"].unique()))
+print("rules:", rules)
+print("rows per model/rule:")
+print(out.groupby(["model", "nvc"]).size().unstack(fill_value=0).to_string())
+print("\nMean accuracies and improvements:")
+summary = out.groupby(["model", "nvc"], as_index=False)[["hit_model", "hit_nvc", "improvement"]].mean()
+print(summary.to_string(index=False))
+print("\nFirst 12 output rows:")
+print(out.head(12).to_string(index=False))
 [OBS t60 step 8 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Wrote pred_results/accuracies.csv | shape: (2240, 9) | MFA ties: 0 [] | models: ['Atmosphere', 'Conversion', 'MMT', 'Matching', 'PHM', 'PSYCOP', 'VerbalModels'] | rules: ['PartNeg', 'EmptyStart', 'FiguralRule', 'NegativityRule', 'ParticularityRule'] | rows per model/rule: | nvc           EmptyStart  FiguralRule  NegativityRule  PartNeg  ParticularityRule | model                                                                             | Atmosphere            64           64              64       64                 64 | Conversion            64           64              64       64                 64 | MMT                   64           64              64       64                 64 | Matching              64           64              64       64                 64 | PHM                   64           64              64       64                 64 | PSYCOP                64           64              64       64                 64 | VerbalModels          64           64              64       64                 64 |  | Mean accuracies and improvements: |        model               nvc  hit_model  hit_nvc  improvement |   Atmosphere        EmptyStart   ... [TRUNCATED]
 
 ===== POINT 31/38: t67s2@1791614918-361358 =====
 [TASK-DESC] Analyze cognitive theories using pattern similarity. Process CSV files containing model predictions for various syllogistic reasoning tasks. Calculate similarity scores between these models and pre-computed high-conscientiousness and high-openness patterns. The results will contain similarity scores for each cognitive model with respect to the personality trait patterns. Save the similarity scores for every model to 'pred_results/CogSci_pattern_high_sim_data_pred.csv' using the trait names "conscientiousness" and "openness" as column names.
-[STEP-CODE t67 step 2] (10 chars)
-step_02.py
+[STEP-CODE t67 step 2] (2944 chars)
+#!/usr/bin/env python3
+import os
+import numpy as np
+import pandas as pd
+from math import sqrt
+
+base = "CogSci_pattern_high_sim_data"
+csvs = [fn for fn in sorted(os.listdir(base)) if fn.endswith(".csv")]
+
+# Inspect exact orders and candidate similarities to decide implementation.
+first_df = pd.read_csv(os.path.join(base, csvs[0]))
+syll_order = first_df["Syllogism"].astype(str).tolist()
+print("Syllogism order length:", len(syll_order))
+print("Syllogism order:", syll_order)
+
+responses = []
+for fn in csvs:
+    df = pd.read_csv(os.path.join(base, fn))
+    for pred in df["Prediction"].fillna("").astype(str):
+        for r in pred.split(";"):
+            r = r.strip()
+            if r and r not in responses:
+                responses.append(r)
+print("Responses first-seen:", responses)
+print("Responses sorted:", sorted(responses))
+std_resp = ["Aac", "Aca", "Eac", "Eca", "Iac", "Ica", "Oac", "Oca", "NVC"]
+print("Std response set equals observed:", set(std_resp) == set(responses))
+
+def vectorize(csv_path, resp_order):
+    df = pd.read_csv(csv_path)
+    d = dict(zip(df["Syllogism"].astype(str), df["Prediction"].fillna("").astype(str)))
+    v = []
+    for syll in syll_order:
+        pred_set = {x.strip() for x in d[syll].split(";") if x.strip()}
+        v.extend([1.0 if r in pred_set else 0.0 for r in resp_order])
+    return np.array(v, dtype=float)
+
+def cosine(a, b):
+    a = np.asarray(a, dtype=float).ravel()
+    b = np.asarray(b, dtype=float).ravel()
+    den = np.linalg.norm(a) * np.linalg.norm(b)
+    return float(np.dot(a, b) / den) if den else np.nan
+
+def corr(a, b):
+    a = np.asarray(a, dtype=float).ravel()
+    b = np.asarray(b, dtype=float).ravel()
+    aa = a - a.mean()
+    bb = b - b.mean()
+    den = np.linalg.norm(aa) * np.linalg.norm(bb)
+    return float(np.dot(aa, bb) / den) if den else np.nan
+
+for resp_order_name, resp_order in [("std", std_resp), ("sorted", sorted(responses)), ("firstseen", responses)]:
+    print("\n=== Response order:", resp_order_name, resp_order)
+    for trait in ["conscientiousness", "openness"]:
+        W = np.load(os.path.join(base, f"fit_result_{trait}_W_high.npy"))
+        print("\nTrait", trait, "W col norms", [np.linalg.norm(W[:, i]) for i in range(W.shape[1])], "col sums", [W[:, i].sum() for i in range(W.shape[1])])
+        rows = []
+        for fn in csvs:
+            name = os.path.splitext(fn)[0]
+            v = vectorize(os.path.join(base, fn), resp_order)
+            rows.append({
+                "model": name,
+                "n_pred": int(v.sum()),
+                "cos_col0": cosine(v, W[:,0]),
+                "cos_col1": cosine(v, W[:,1]),
+                "cos_sum": cosine(v, W.sum(axis=1)),
+                "corr_col0": corr(v, W[:,0]),
+                "corr_col1": corr(v, W[:,1]),
+                "corr_sum": corr(v, W.sum(axis=1)),
+            })
+        out = pd.DataFrame(rows)
+        print(out.to_string(index=False, float_format=lambda x: f"{x:.6f}"))
 [OBS t67 step 2 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Syllogism order length: 64 | Syllogism order: ['AA1', 'AA2', 'AA3', 'AA4', 'AI1', 'AI2', 'AI3', 'AI4', 'AE1', 'AE2', 'AE3', 'AE4', 'AO1', 'AO2', 'AO3', 'AO4', 'IA1', 'IA2', 'IA3', 'IA4', 'II1', 'II2', 'II3', 'II4', 'IE1', 'IE2', 'IE3', 'IE4', 'IO1', 'IO2', 'IO3', 'IO4', 'EA1', 'EA2', 'EA3', 'EA4', 'EI1', 'EI2', 'EI3', 'EI4', 'EE1', 'EE2', 'EE3', 'EE4', 'EO1', 'EO2', 'EO3', 'EO4', 'OA1', 'OA2', 'OA3', 'OA4', 'OI1', 'OI2', 'OI3', 'OI4', 'OE1', 'OE2', 'OE3', 'OE4', 'OO1', 'OO2', 'OO3', 'OO4'] | Responses first-seen: ['Aac', 'Aca', 'Iac', 'Ica', 'Eac', 'Eca', 'Oac', 'Oca', 'NVC'] | Responses sorted: ['Aac', 'Aca', 'Eac', 'Eca', 'Iac', 'Ica', 'NVC', 'Oac', 'Oca'] | Std response set equals observed: True |  | === Response order: std ['Aac', 'Aca', 'Eac', 'Eca', 'Iac', 'Ica', 'Oac', 'Oca', 'NVC'] |  | Trait conscientiousness W col norms [0.9999996267983098, 0.9999969016027249] col sums [10.816220935182276, 10.786010440748665] |        model  n_pred  cos_col0  cos_col1  cos_sum  corr_col0  corr_col1  corr_sum |   Atmosphere     128  0.261323  0.203524 0.284605   0.062077  -0.010578  0.033726 |   Conversion      84  0.530875  0.108866 0.391685   0.434856  -0. ... [TRUNCATED]
 
 ===== POINT 32/38: t67s3@1791613863-318166 =====
 [TASK-DESC] Analyze cognitive theories using pattern similarity. Process CSV files containing model predictions for various syllogistic reasoning tasks. Calculate similarity scores between these models and pre-computed high-conscientiousness and high-openness patterns. The results will contain similarity scores for each cognitive model with respect to the personality trait patterns. Save the similarity scores for every model to 'pred_results/CogSci_pattern_high_sim_data_pred.csv' using the trait names "conscientiousness" and "openness" as column names.
-[STEP-CODE t67 step 3] (10 chars)
-step_03.py
+[STEP-CODE t67 step 3] (2146 chars)
+import os
+import numpy as np
+import pandas as pd
+
+base = "CogSci_pattern_high_sim_data"
+model_files = sorted([f for f in os.listdir(base) if f.endswith(".csv")])
+sylls = pd.read_csv(os.path.join(base, model_files[0]))["Syllogism"].tolist()
+orders = {
+    "AIEN": ["Aac","Aca","Iac","Ica","Eac","Eca","Oac","Oca","NVC"],
+    "AEIN": ["Aac","Aca","Eac","Eca","Iac","Ica","Oac","Oca","NVC"],
+    "alpha": ['Aac', 'Aca', 'Eac', 'Eca', 'Iac', 'Ica', 'NVC', 'Oac', 'Oca'],
+}
+traits = {
+    "conscientiousness": np.load(os.path.join(base, "fit_result_conscientiousness_W_high.npy")),
+    "openness": np.load(os.path.join(base, "fit_result_openness_W_high.npy")),
+}
+
+def vectorize(df, order, weighting):
+    idx = {tok:i for i,tok in enumerate(order)}
+    vec = np.zeros(64*9, dtype=float)
+    for r, row in df.iterrows():
+        toks = str(row["Prediction"]).split(";")
+        if weighting == "binary":
+            vals = {tok: 1.0 for tok in toks}
+        elif weighting == "uniform":
+            vals = {tok: 1.0/len(toks) for tok in toks}
+        else:
+            raise ValueError
+        for tok, val in vals.items():
+            vec[r*9 + idx[tok]] = val
+    return vec
+
+def cos(a,b):
+    na=np.linalg.norm(a); nb=np.linalg.norm(b)
+    return float(np.dot(a,b)/(na*nb)) if na and nb else np.nan
+
+for order_name, order in orders.items():
+    for weighting in ["binary", "uniform"]:
+        print("\nAlternative:", order_name, weighting)
+        rows=[]
+        for mf in model_files:
+            df=pd.read_csv(os.path.join(base,mf))
+            v=vectorize(df, order, weighting)
+            row={"model": os.path.splitext(mf)[0], "nnz": int(np.sum(v>0)), "norm": np.linalg.norm(v)}
+            for trait, W in traits.items():
+                comps=[cos(v,W[:,j]) for j in range(W.shape[1])]
+                row[trait+"_c0"]=comps[0]
+                row[trait+"_c1"]=comps[1]
+                row[trait+"_max"]=max(comps)
+                row[trait+"_mean"]=float(np.mean(comps))
+                row[trait+"_sumvec"]=cos(v,W.sum(axis=1))
+            rows.append(row)
+        out=pd.DataFrame(rows)
+        print(out.round(6).to_string(index=False))
 [OBS t67 step 3 first 1200 chars]
 exit_code: 0 | --- STDOUT --- |  | Alternative: AIEN binary |        model  nnz      norm  conscientiousness_c0  conscientiousness_c1  conscientiousness_max  conscientiousness_mean  conscientiousness_sumvec  openness_c0  openness_c1  openness_max  openness_mean  openness_sumvec |   Atmosphere  128 11.313708              0.474488              0.522860               0.522860                0.498674                  0.610632     0.534766     0.112792      0.534766       0.323779         0.358701 |   Conversion   84  9.165151              0.650358              0.235407               0.650358                0.442883                  0.542314     0.645304     0.621258      0.645304       0.633281         0.701584 |          MMT  227 15.066519              0.658485              0.478131               0.658485                0.568308                  0.695899     0.688230     0.529738      0.688230       0.608984         0.674666 |     Matching  192 13.856406              0.358383              0.669315               0.669315                0.513849                  0.629213     0.433682     0.045531      0.433682       0.239606         0.265450 |          PHM  160 12.649111              0. ... [TRUNCATED]
 
 ===== POINT 33/38: t67s4@1791613863-318166 =====
 [TASK-DESC] Analyze cognitive theories using pattern similarity. Process CSV files containing model predictions for various syllogistic reasoning tasks. Calculate similarity scores between these models and pre-computed high-conscientiousness and high-openness patterns. The results will contain similarity scores for each cognitive model with respect to the personality trait patterns. Save the similarity scores for every model to 'pred_results/CogSci_pattern_high_sim_data_pred.csv' using the trait names "conscientiousness" and "openness" as column names.
-[STEP-CODE t67 step 4] (10 chars)
-step_04.py
+[STEP-CODE t67 step 4] (2723 chars)
+import os
+import numpy as np
+import pandas as pd
+
+# Paths
+base_dir = "CogSci_pattern_high_sim_data"
+out_dir = "pred_results"
+out_path = os.path.join(out_dir, "CogSci_pattern_high_sim_data_pred.csv")
+os.makedirs(out_dir, exist_ok=True)
+
+# The 576-dimensional pattern vectors are ordered as 64 syllogisms x 9 response types.
+# This order matches the structure of the supplied W_high matrices: e.g., top entries
+# align with AA -> A, AI/IA -> I, AE/EA -> E, etc.
+response_order = ["Aac", "Aca", "Iac", "Ica", "Eac", "Eca", "Oac", "Oca", "NVC"]
+
+# Load high-trait pattern matrices.  Each has shape (576, 2), i.e. two latent
+# high-trait patterns.  A model receives the cosine similarity of its prediction
+# vector to the closest latent pattern for that trait.
+trait_patterns = {
+    "conscientiousness": np.load(os.path.join(base_dir, "fit_result_conscientiousness_W_high.npy")),
+    "openness": np.load(os.path.join(base_dir, "fit_result_openness_W_high.npy")),
+}
+
+def prediction_vector(csv_path):
+    """Convert semicolon-separated model predictions to a binary 64*9 vector."""
+    df = pd.read_csv(csv_path)
+    tok_to_idx = {tok: i for i, tok in enumerate(response_order)}
+    vec = np.zeros(len(df) * len(response_order), dtype=float)
+
+    for row_idx, pred in enumerate(df["Prediction"].fillna("").astype(str)):
+        for tok in pred.split(";"):
+            tok = tok.strip()
+            if not tok:
+                continue
+            if tok not in tok_to_idx:
+                raise ValueError(f"Unknown response token {tok!r} in {csv_path}")
+            vec[row_idx * len(response_order) + tok_to_idx[tok]] = 1.0
+
+    return vec
+
+def cosine_similarity(a, b):
+    denom = np.linalg.norm(a) * np.linalg.norm(b)
+    if denom == 0:
+        return np.nan
+    return float(np.dot(a, b) / denom)
+
+# Use a stable, human-readable model order.
+model_files = ["Atmosphere.csv", "Conversion.csv", "Matching.csv", "MMT.csv",
+               "PHM.csv", "PSYCOP.csv", "VerbalModels.csv"]
+
+rows = []
+for model_file in model_files:
+    path = os.path.join(base_dir, model_file)
+    vec = prediction_vector(path)
+    model_name = os.path.splitext(model_file)[0]
+
+    row = {"model": model_name}
+    for trait, W in trait_patterns.items():
+        if W.shape != (vec.size, 2):
+            raise ValueError(f"Unexpected shape for {trait}: {W.shape}, expected {(vec.size, 2)}")
+        component_sims = [cosine_similarity(vec, W[:, j]) for j in range(W.shape[1])]
+        row[trait] = max(component_sims)
+
+    rows.append(row)
+
+out_df = pd.DataFrame(rows, columns=["model", "conscientiousness", "openness"])
+out_df.to_csv(out_path, index=False)
+
+print("Saved:", out_path)
+print("Shape:", out_df.shape)
+print(out_df.to_string(index=False))
 [OBS t67 step 4 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Saved: pred_results/CogSci_pattern_high_sim_data_pred.csv | Shape: (7, 3) |        model  conscientiousness  openness |   Atmosphere           0.522860  0.534766 |   Conversion           0.650358  0.645304 |     Matching           0.669315  0.433682 |          MMT           0.658485  0.688230 |          PHM           0.516571  0.466238 |       PSYCOP           0.587094  0.581916 | VerbalModels           0.749226  0.737686 |  | --- STDERR --- |
 
 ===== POINT 34/38: t67s4@1791614918-361358 =====
 [TASK-DESC] Analyze cognitive theories using pattern similarity. Process CSV files containing model predictions for various syllogistic reasoning tasks. Calculate similarity scores between these models and pre-computed high-conscientiousness and high-openness patterns. The results will contain similarity scores for each cognitive model with respect to the personality trait patterns. Save the similarity scores for every model to 'pred_results/CogSci_pattern_high_sim_data_pred.csv' using the trait names "conscientiousness" and "openness" as column names.
-[STEP-CODE t67 step 4] (10 chars)
-step_04.py
+[STEP-CODE t67 step 4] (2378 chars)
+#!/usr/bin/env python3
+import os
+import numpy as np
+import pandas as pd
+
+base = "CogSci_pattern_high_sim_data"
+outdir = "pred_results"
+os.makedirs(outdir, exist_ok=True)
+
+# Standard syllogistic response vectorization: 64 syllogisms x 9 response options = 576.
+response_order = ["Aac", "Aca", "Eac", "Eca", "Iac", "Ica", "Oac", "Oca", "NVC"]
+syllogism_order = pd.read_csv(os.path.join(base, "Atmosphere.csv"))["Syllogism"].astype(str).tolist()
+
+def vectorize_predictions(csv_path):
+    df = pd.read_csv(csv_path)
+    pred_by_syllogism = dict(zip(df["Syllogism"].astype(str), df["Prediction"].fillna("").astype(str)))
+    vec = np.zeros(len(syllogism_order) * len(response_order), dtype=float)
+    k = 0
+    for syllogism in syllogism_order:
+        pred_set = {x.strip() for x in pred_by_syllogism[syllogism].split(";") if x.strip()}
+        for response in response_order:
+            vec[k] = 1.0 if response in pred_set else 0.0
+            k += 1
+    return vec
+
+def cosine_similarity(a, b):
+    a = np.asarray(a, dtype=float).ravel()
+    b = np.asarray(b, dtype=float).ravel()
+    denom = np.linalg.norm(a) * np.linalg.norm(b)
+    if denom == 0:
+        return np.nan
+    return float(np.dot(a, b) / denom)
+
+def trait_similarity(model_vec, W_high):
+    # Each W_high file contains two high-trait pattern columns.  Compare the
+    # model prediction pattern with the combined high-trait pattern.
+    high_pattern = np.asarray(W_high, dtype=float).sum(axis=1)
+    return cosine_similarity(model_vec, high_pattern)
+
+model_files = sorted(fn for fn in os.listdir(base) if fn.endswith(".csv"))
+trait_W = {
+    "conscientiousness": np.load(os.path.join(base, "fit_result_conscientiousness_W_high.npy")),
+    "openness": np.load(os.path.join(base, "fit_result_openness_W_high.npy")),
+}
+
+rows = []
+for fn in model_files:
+    model_name = os.path.splitext(fn)[0]
+    model_vec = vectorize_predictions(os.path.join(base, fn))
+    row = {"model": model_name}
+    for trait, W in trait_W.items():
+        row[trait] = trait_similarity(model_vec, W)
+    rows.append(row)
+
+result = pd.DataFrame(rows, columns=["model", "conscientiousness", "openness"])
+outpath = os.path.join(outdir, "CogSci_pattern_high_sim_data_pred.csv")
+result.to_csv(outpath, index=False)
+
+print("Saved:", outpath)
+print("Shape:", result.shape)
+print(result.to_string(index=False, float_format=lambda x: f"{x:.12f}"))
 [OBS t67 step 4 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Saved: pred_results/CogSci_pattern_high_sim_data_pred.csv | Shape: (7, 3) |        model  conscientiousness       openness |   Atmosphere     0.284604868647 0.198470576241 |   Conversion     0.391685204461 0.612498939725 |          MMT     0.440658903118 0.549547449328 |     Matching     0.241665699901 0.108121889496 |          PHM     0.260909730491 0.163492405001 |       PSYCOP     0.419404557611 0.573191799985 | VerbalModels     0.418667082487 0.636413476030 |  | --- STDERR --- |
 
 ===== POINT 35/38: t85s1@1791613931-318581 =====
 [TASK-DESC] Analyze the given saliva data and compute features that represent sample statistics or distribution (e.g., mean, location of max/min value, skewness) for each subject. Save the computed features along with subject condition as a dictionary of dictionaries into a json file "pred_results/saliva_pred.json".
-[STEP-CODE t85 step 1] (10 chars)
-step_01.py
+[STEP-CODE t85 step 1] (784 chars)
+#!/usr/bin/env python3
+import os
+import json
+import pickle
+import pandas as pd
+import numpy as np
+
+path = "saliva_data/data.pkl"
+print("Exists:", os.path.exists(path))
+df = pd.read_pickle(path)
+print("Type:", type(df))
+print("Shape:", df.shape)
+print("Index:", df.index.names, type(df.index))
+print("Columns:", df.columns.tolist())
+print("Head:")
+print(df.head(10))
+print("Dtypes:")
+print(df.dtypes)
+print("Index levels:")
+if isinstance(df.index, pd.MultiIndex):
+    for name, vals in zip(df.index.names, df.index.levels):
+        print(name, len(vals), list(vals)[:10])
+print("Number of groups by condition/subject:")
+print(df.groupby(level=["condition", "subject"]).size().head(20))
+print("Total subjects:", len(df.groupby(level=["condition", "subject"])))
+print("Done inspection.")
 [OBS t85 step 1 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Exists: True | Type: <class 'pandas.core.frame.DataFrame'> | Shape: (154, 1) | Index: ['condition', 'subject', 'sample'] <class 'pandas.core.indexes.multi.MultiIndex'> | Columns: ['cortisol'] | Head: |                              cortisol | condition    subject sample           | Intervention Vp01    0        6.98890 |                      1        7.03320 |                      2        5.77670 |                      3        5.25790 |                      4        5.00795 |                      5        4.50045 |                      6        4.06615 | Control      Vp03    0        5.39850 |                      1       13.27400 |                      2       10.10115 | Dtypes: | cortisol    float64 | dtype: object | Index levels: | condition 2 ['Control', 'Intervention'] | subject 26 ['Vp01', 'Vp02', 'Vp03', 'Vp04', 'Vp05', 'Vp06', 'Vp08', 'Vp09', 'Vp10', 'Vp11'] | sample 7 ['0', '1', '2', '3', '4', '5', '6'] | Number of groups by condition/subject: | condition     subject | Control       Vp03       7 |               Vp06       7 |               Vp08       7 |               Vp09       7 |               Vp17       7 |               Vp19       7 |  ... [TRUNCATED]
 
 ===== POINT 36/38: t85s1@1791614969-361789 =====
 [TASK-DESC] Analyze the given saliva data and compute features that represent sample statistics or distribution (e.g., mean, location of max/min value, skewness) for each subject. Save the computed features along with subject condition as a dictionary of dictionaries into a json file "pred_results/saliva_pred.json".
-[STEP-CODE t85 step 1] (10 chars)
-step_01.py
+[STEP-CODE t85 step 1] (2519 chars)
+#!/usr/bin/env python3
+import os
+import pickle
+import json
+import pandas as pd
+import numpy as np
+
+DATA_PATH = "saliva_data/data.pkl"
+OUT_PATH = "pred_results/saliva_pred.json"
+
+print(f"Loading {DATA_PATH} ...")
+df = pd.read_pickle(DATA_PATH)
+print("Loaded object type:", type(df))
+print("Shape:", getattr(df, "shape", None))
+print("Index names:", getattr(df.index, "names", None))
+print("Columns:", list(df.columns) if hasattr(df, "columns") else None)
+print("Head:")
+print(df.head(10))
+
+print("\nIndex level values/counts:")
+if isinstance(df.index, pd.MultiIndex):
+    for name in df.index.names:
+        vals = df.index.get_level_values(name)
+        print(name, "nunique=", vals.nunique(), "first=", list(pd.unique(vals)[:10]))
+else:
+    print(df.index[:10])
+
+# Compute first-pass features to verify grouping.
+if "cortisol" not in df.columns:
+    raise ValueError("Expected a 'cortisol' column")
+
+if isinstance(df.index, pd.MultiIndex) and {"condition", "subject", "sample"}.issubset(set(df.index.names)):
+    grouped = df["cortisol"].groupby(level=["condition", "subject"])
+else:
+    raise ValueError("Expected MultiIndex with condition, subject, sample")
+
+rows = []
+for (condition, subject), s in grouped:
+    s = s.sort_index(level="sample")
+    sample_index = s.index.get_level_values("sample")
+    values = pd.to_numeric(s, errors="coerce")
+    max_pos = int(np.nanargmax(values.to_numpy(dtype=float)))
+    min_pos = int(np.nanargmin(values.to_numpy(dtype=float)))
+    row = {
+        "condition": str(condition),
+        "subject": str(subject),
+        "n": int(values.notna().sum()),
+        "argmax": int(sample_index[max_pos]),
+        "argmin": int(sample_index[min_pos]),
+        "mean": float(values.mean()),
+        "std": float(values.std()),
+        "skew": float(values.skew()),
+        "kurt": float(values.kurt()),
+        "min": float(values.min()),
+        "max": float(values.max()),
+    }
+    rows.append(row)
+
+features_df = pd.DataFrame(rows)
+print("\nComputed feature preview:")
+print(features_df.head())
+print("\nSubjects:", len(features_df))
+print("Condition counts:")
+print(features_df["condition"].value_counts())
+
+# Save a temporary preview for continuity/debugging.
+os.makedirs("pred_results", exist_ok=True)
+preview_path = "pred_results/saliva_pred_preview.json"
+preview = {
+    r["subject"]: {k: v for k, v in r.items() if k != "subject"}
+    for r in rows[:5]
+}
+with open(preview_path, "w") as f:
+    json.dump(preview, f, indent=2)
+print(f"\nWrote preview JSON to {preview_path}")
 [OBS t85 step 1 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Loading saliva_data/data.pkl ... | Loaded object type: <class 'pandas.core.frame.DataFrame'> | Shape: (154, 1) | Index names: ['condition', 'subject', 'sample'] | Columns: ['cortisol'] | Head: |                              cortisol | condition    subject sample           | Intervention Vp01    0        6.98890 |                      1        7.03320 |                      2        5.77670 |                      3        5.25790 |                      4        5.00795 |                      5        4.50045 |                      6        4.06615 | Control      Vp03    0        5.39850 |                      1       13.27400 |                      2       10.10115 |  | Index level values/counts: | condition nunique= 2 first= ['Intervention', 'Control'] | subject nunique= 22 first= ['Vp01', 'Vp03', 'Vp05', 'Vp06', 'Vp08', 'Vp09', 'Vp10', 'Vp15', 'Vp16', 'Vp17'] | sample nunique= 7 first= ['0', '1', '2', '3', '4', '5', '6'] |  | Computed feature preview: |   condition subject  n  argmax  ...      skew      kurt      min       max | 0   Control    Vp03  7       3  ... -1.433263  2.214301  5.39850  14.23000 | 1   Control    Vp06  7       5  ... -0.358008 ... [TRUNCATED]
 
 ===== POINT 37/38: t85s2@1791613931-318581 =====
 [TASK-DESC] Analyze the given saliva data and compute features that represent sample statistics or distribution (e.g., mean, location of max/min value, skewness) for each subject. Save the computed features along with subject condition as a dictionary of dictionaries into a json file "pred_results/saliva_pred.json".
-[STEP-CODE t85 step 2] (10 chars)
-step_02.py
+[STEP-CODE t85 step 2] (2715 chars)
+#!/usr/bin/env python3
+import os
+import json
+import math
+import pandas as pd
+import numpy as np
+
+INPUT_PATH = "saliva_data/data.pkl"
+OUTPUT_PATH = "pred_results/saliva_pred.json"
+
+df = pd.read_pickle(INPUT_PATH)
+if not isinstance(df.index, pd.MultiIndex):
+    raise ValueError("Expected a MultiIndex with levels condition, subject, sample.")
+required_levels = {"condition", "subject", "sample"}
+if set(df.index.names) != required_levels:
+    raise ValueError(f"Expected index levels {required_levels}, got {df.index.names}.")
+if "cortisol" not in df.columns:
+    raise ValueError("Expected a 'cortisol' column.")
+
+def json_safe(value):
+    """Convert numpy/pandas scalar values and NaNs to JSON-compatible Python values."""
+    if isinstance(value, (np.integer,)):
+        return int(value)
+    if isinstance(value, (np.floating,)):
+        value = float(value)
+    if isinstance(value, float):
+        if math.isnan(value) or math.isinf(value):
+            return None
+        return value
+    return value
+
+def sample_to_json_value(sample_label):
+    """Represent sample location compactly; samples in this dataset are string digits."""
+    if isinstance(sample_label, (np.integer, int)):
+        return int(sample_label)
+    if isinstance(sample_label, (np.floating, float)) and float(sample_label).is_integer():
+        return int(sample_label)
+    s = str(sample_label)
+    if s.isdigit():
+        return int(s)
+    return s
+
+results = {}
+
+# Sort for deterministic output.
+for (condition, subject), group in df.sort_index().groupby(level=["condition", "subject"], sort=True):
+    series = group["cortisol"].droplevel(["condition", "subject"])
+    # Ensure numerical sample order (rather than lexicographic) if labels are numeric strings.
+    order = sorted(series.index, key=lambda x: int(x) if str(x).isdigit() else str(x))
+    series = series.loc[order].astype(float)
+
+    max_sample = series.idxmax()
+    features = {
+        "condition": str(condition),
+        "argmax": sample_to_json_value(max_sample),
+        "mean": json_safe(series.mean()),
+        "std": json_safe(series.std()),       # pandas default ddof=1, matching standard sample statistics
+        "skew": json_safe(series.skew()),     # pandas/Fisher-Pearson adjusted skewness
+        "kurt": json_safe(series.kurt()),     # pandas excess kurtosis
+    }
+    results[str(subject)] = features
+
+os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
+with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
+    json.dump(results, f, indent=2, sort_keys=True)
+
+print(f"Wrote {OUTPUT_PATH}")
+print(f"Number of subjects: {len(results)}")
+print("First five subjects/features:")
+for subject in sorted(results)[:5]:
+    print(subject, results[subject])
 [OBS t85 step 2 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Wrote pred_results/saliva_pred.json | Number of subjects: 22 | First five subjects/features: | Vp01 {'condition': 'Intervention', 'argmax': 1, 'mean': 5.51875, 'std': 1.1545113713890678, 'skew': 0.3633256097384234, 'kurt': -1.31900226119713} | Vp03 {'condition': 'Control', 'argmax': 3, 'mean': 11.43395, 'std': 3.067824876982604, 'skew': -1.4332627692641073, 'kurt': 2.2143009983048527} | Vp05 {'condition': 'Intervention', 'argmax': 0, 'mean': 6.207607142857143, 'std': 1.5244550254185298, 'skew': 0.7399541140404917, 'kurt': -1.5989747908955483} | Vp06 {'condition': 'Control', 'argmax': 5, 'mean': 10.483878571428571, 'std': 4.101965815095768, 'skew': -0.35800823093594397, 'kurt': -1.4971093062078835} | Vp08 {'condition': 'Control', 'argmax': 3, 'mean': 3.71375, 'std': 1.103525467158174, 'skew': 0.7727248248652334, 'kurt': -0.729210588347196} |  | --- STDERR --- |
 
@@ -273,7 +3899,48 @@ exit_code: 0 | --- STDOUT --- | Wrote pred_results/saliva_pred.json | Number of 
 6. distinct importance: the sum of entries in the second column of H_high and H_low, divided by the sum of all entries in H_high and H_low.
 Store the scores in a dictionary where each factor name maps to its score value. Save the dictionary as a json file to "pred_results/jnmf_h_importances.json".
 
-[STEP-CODE t92 step 1] (10 chars)
-step_01.py
+[STEP-CODE t92 step 1] (1487 chars)
+#!/usr/bin/env python3
+import json
+from pathlib import Path
+
+import numpy as np
+
+base = Path("jnmf_visualization")
+out_path = Path("pred_results/jnmf_h_importances.json")
+out_path.parent.mkdir(parents=True, exist_ok=True)
+
+W_high = np.load(base / "fit_result_conscientiousness_W_high.npy")
+W_low = np.load(base / "fit_result_conscientiousness_W_low.npy")
+H_high = np.load(base / "fit_result_conscientiousness_H_high.npy")
+H_low = np.load(base / "fit_result_conscientiousness_H_low.npy")
+
+print("Loaded arrays:")
+print(f"  W_high shape: {W_high.shape}")
+print(f"  W_low  shape: {W_low.shape}")
+print(f"  H_high shape: {H_high.shape}")
+print(f"  H_low  shape: {H_low.shape}")
+
+total_H_high = float(np.sum(H_high))
+total_H_low = float(np.sum(H_low))
+total_H_both = total_H_high + total_H_low
+
+scores = {
+    "common error": float(1.0 - np.dot(W_high[:, 0], W_low[:, 0])),
+    "common importance": float((np.sum(H_high[:, 0]) + np.sum(H_low[:, 0])) / total_H_both),
+    "high importance": float(np.sum(H_high[:, 1]) / total_H_high),
+    "low importance": float(np.sum(H_low[:, 1]) / total_H_low),
+    "distinct error": float(np.dot(W_high[:, 1], W_low[:, 1])),
+    "distinct importance": float((np.sum(H_high[:, 1]) + np.sum(H_low[:, 1])) / total_H_both),
+}
+
+with out_path.open("w", encoding="utf-8") as f:
+    json.dump(scores, f, indent=2, sort_keys=True)
+
+print("Computed scores:")
+for key, value in scores.items():
+    print(f"  {key}: {value:.17g}")
+
+print(f"Saved JSON to: {out_path}")
 [OBS t92 step 1 first 1200 chars]
 exit_code: 0 | --- STDOUT --- | Loaded arrays: |   W_high shape: (576, 2) |   W_low  shape: (576, 2) |   H_high shape: (46, 2) |   H_low  shape: (60, 2) | Computed scores: |   common error: 0.019074017463533988 |   common importance: 0.67694773029397826 |   high importance: 0.29836055701149189 |   low importance: 0.34259264124640232 |   distinct error: 0.0054058374290512894 |   distinct importance: 0.32305226970602163 | Saved JSON to: pred_results/jnmf_h_importances.json |  | --- STDERR --- |
