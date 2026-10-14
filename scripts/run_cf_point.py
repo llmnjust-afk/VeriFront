@@ -80,6 +80,10 @@ def main() -> int:
                          "only (v1) or additionally when the validator report "
                          "fails (v2; semantic-failure trigger). Identical for "
                          "both arms, so fairness holds.")
+    ap.add_argument("--suffix-takeover", action="store_true",
+                    help="plan sec5.2: the edit model generates ALL steps from "
+                         "--at-step onward (suffix takeover), not just the single "
+                         "edit step. Prefix replay and budget accounting unchanged.")
     ap.add_argument("--python-bin", default=PYTHON_BIN_DEFAULT)
     ap.add_argument("--workdir-root", default="/tmp/vf_work")
     ap.add_argument("--artifacts-root", default=str(ROOT / "runs"))
@@ -146,7 +150,7 @@ def main() -> int:
     messages = rebuild_messages(spec, config, prefix_steps)
 
     def client_for_step(step_i: int):
-        if step_i == args.at_step and edit_client is not None:
+        if edit_client is not None and (step_i == args.at_step or args.suffix_takeover):
             return edit_client
         return frontier_client
 
@@ -212,6 +216,7 @@ def main() -> int:
         "edit_model_snapshot": args.edit_model_snapshot,
         "feedback_mode": args.feedback_mode,
         "trigger": args.trigger,
+        "suffix_takeover": bool(args.suffix_takeover),
         "retry_used": retry_used,
         "validator_report": validator_last_report[0],
         "parent_run": str(parent), "parent_outcome": parent_result["eval_success"],
