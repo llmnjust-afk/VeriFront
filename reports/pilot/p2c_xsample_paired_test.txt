@@ -1,0 +1,4 @@
+A_loto49_in_dist: dRho=+0.1288  n=177  two-sided paired perm p=0.0010  (exceed=19)
+B_chem18_from49: dRho=-0.2617  n=72  two-sided paired perm p=0.0695  (exceed=1390)
+B_chem18_from39: dRho=-0.1728  n=72  two-sided paired perm p=0.1733  (exceed=3466)
+C_chem18_from56: dRho=-0.2654  n=72  two-sided paired perm p=0.1113  (exceed=2226)

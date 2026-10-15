@@ -69,3 +69,23 @@ result, not a power-limited null - the feature--outcome mapping reversal for
 deliverable steps documented in round 1 is confirmed at scale (t51s4: ds/mini
 collapse where qwen/resample succeed; t44s12: every arm fails the deliverable
 step of a 12-step trajectory).
+
+
+## Paired permutation test (post-analysis addition)
+
+A paired permutation test that swaps the two models' predictions within each evaluation
+observation (20,000 permutations, seed 20260715) formalizes the model comparison:
+
+| setting | dRho | two-sided p |
+|---|---|---|
+| A: LOTO 49 pts (177 obs) | +0.129 | **0.0010** |
+| B: chem 18 pts, from 49 pts | -0.262 | 0.0695 |
+| B: chem 18 pts, from 39 pts | -0.173 | 0.1733 |
+| C: chem 18 pts, from 56 pts | -0.265 | 0.1113 |
+
+The in-distribution gain is formally significant; the out-of-distribution deficit is
+consistent in direction across all configurations (p = 0.07-0.17, two-sided), i.e. a
+stable negative tendency that does not reach 0.05 in any single configuration.
+Script: `scripts/p2c_xsample_paired_test.py`; output: `reports/pilot/p2c_xsample_paired_test.txt`.
+Figure 4 redrawn from the 49-point LOTO folds and the 18-point chemistry predictions
+(`scripts/make_fig4_xsample.py`).
