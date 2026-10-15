@@ -1,4 +1,4 @@
-# P2 阶段总结（截至 2026-10-15 晚，commit `54d7c88`）
+# P2 阶段总结（截至 2026-10-15 晚，commit `220f248`）
 
 **依据** `VeriFront_P2_Research_Plan.md` ｜ **代码版本** `8d26ef8` ｜ **执行环境** Lab Compute 1×RTX 4090
 **数据规模**：P1 456 + P2 主体 + 两级外推 + **扩样 182 run**（层 1 88 + 层 2 94，23 新点）+ 15 次 parent 尝试 ≈ **1,000 run**（inventory 为准）；成本累计 ≈ **900 CA ≈ $135**
@@ -228,3 +228,11 @@
 3. 三级泛化阶梯最终表述：**分布内复现 ✓ → 同任务新实例反转 → 新域稳定负向**——可验证性引导的分配是分布内效应，扩展靠每域一轮测量（~$7/域循环），不靠特征跳跃。
 
 论文已同步：Abstract（~1,000 run、74 点、两级 Δρ）、Methods（Scale-up 小节 + Statistics 更新 + availability 更新）、Results（扩样双问句段落）、Discussion（limits 重写——两条方向都不再依赖小样本 caveat）。15 页编译 0 未定义引用。
+
+
+## 十、配对检验与图 4 重绘（220f248）
+
+1. **配对置换检验**（交换逐点两模型预测，20k 次，双边）：分布内 LOTO 49 点 **Δρ +0.129，p=0.0010**——增益首次正式显著；跨域 18 点三配置 Δρ −0.17~−0.27，p=0.07/0.17/0.11——方向一致但单配置未过 0.05，abstract/results 措辞由 "significantly worse" 软化为 "consistently worse"（RMSE 全配置变差仍成立）。脚本 `scripts/p2c_xsample_paired_test.py`，输出 `reports/pilot/p2c_xsample_paired_test.txt`。
+2. **图 4 重绘**：49 点 LOTO 配对误差 + 分臂增益 + 18 点化学域"模型反转"面板（M1 排序差于臂先验，Δρ −0.26 入图注）；caption 同步改写。
+3. **数字修正**：held-out/跨域训练集剔除扫描任务后为 30 点（非 32），methods 两处已改。
+4. 手稿现 17 页，编译 0 未定义引用。
