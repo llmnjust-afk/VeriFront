@@ -36,3 +36,12 @@ Date frozen: 2026-10-15, before any new parent run. Commit at freeze: 0fba43f+.
   permutation counts and seeds unchanged from p2c_xdomain2_eval.py.
 - Decision rules unchanged: H2 supported iff dRMSE<=0 and dRho>=0.1 under LOTO
   on the enlarged set; out-of-distribution tiers reported descriptively.
+
+## Amendment 1 (2026-10-15, after first parent round)
+
+First round: 45/35/58/51 accepted; 53/92/5/22 failed twice each (eval_crash x2,
+func_correctness=False, 0/336 tests) and are moved on from per the frozen rule.
+Layer-1 candidate pool is EXTENDED in ascending point-count order to the next
+tasks: **44, 34, 40, 85** (<=2 attempts each), target still >=6 additional
+accepted parents (12 points). Layer-2 substitutes 22 with **95**. No other rule
+changes.
