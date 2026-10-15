@@ -1,0 +1,7 @@
+point_id,F1,F2,F3,F4,F5,F6,F7,rationale
+t1s1@1792027104-2691932,0,0,1,1,0,1,code_script,exploration printout; no artifacts, no correctness standard
+t1s2@1792027104-2691932,0,0,1,1,1,1,code_script,descriptive statistics printed; the repeated file paths re-confirm the layout step 1 established (mild state dependence); no artifacts
+t1s3@1792027104-2691932,1,2,2,1,1,1,code_script,writes the required deliverable; validation metrics give specific feedback; builds on the column semantics seen in earlier steps
+t3s1@1792027829-2732525,0,0,1,1,0,1,code_script,inspection of dataset layout and dtypes; no artifacts
+t3s2@1792027829-2732525,1,1,1,2,0,1,code_script,quantifiable diagnostics but the OBS excerpt shows only the exit_code 1 signal without the traceback text (F3=1); the failure still pinpoints the debugging direction (F4=2)
+t3s3@1792027829-2732525,1,2,2,1,1,1,code_script,deliverable-producing modelling step reusing the physics-relation finding from the diagnostic step

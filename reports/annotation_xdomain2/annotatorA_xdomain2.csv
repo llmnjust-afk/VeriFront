@@ -1,0 +1,7 @@
+point_id,F1,F2,F3,F4,F5,F6,F7,rationale
+t1s1@1792027104-2691932,0,0,1,1,0,1,code_script,environment+data exploration: prints python/platform/dir/file listing and CSV heads; nothing has a right answer; only task inputs touched
+t1s2@1792027104-2691932,0,0,1,1,0,1,code_script,data overview: shapes/columns/label distributions printed; deterministic descriptive output with no correctness standard; no artifacts
+t1s3@1792027104-2691932,1,2,2,1,1,1,code_script,full modelling step writing pred_results/clintox_test_pred.csv -> F2=2; validation ROC-AUC/counts give task-specific feedback -> F3=2; final correctness depends on the benchmark checker (F1=1); inherits label/split understanding from prior exploration -> F5=1
+t3s1@1792027829-2732525,0,0,1,1,0,1,code_script,file-tree walk + schema/dtype overview; pure inspection, no artifacts, task inputs only
+t3s2@1792027829-2732525,1,1,2,2,0,1,code_script,diagnostic step: K_VRH degeneracy check, physics-relation residual stats, 5-fold CV; OBS shows exit_code 1 with explicit failure signal -> F3=2; the failing locus is directly visible -> F4=2; prints are verifiable intermediates -> F2=1; reads task inputs only -> F5=0
+t3s3@1792027829-2732525,1,2,2,1,1,1,code_script,final modelling step writing pred_results/compound_bulk_modulus.csv -> F2=2; physics relation MAE identical to step-2 residual stats (explicit dependence on the prior step's conclusion) -> F5=1; CV metrics give task-specific feedback -> F3=2
