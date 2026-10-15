@@ -550,6 +550,18 @@ class CodeActAgent:
         return self._unshare_cmd(script)
 
 
+def _http_timeout_s() -> float:
+    """HTTP read timeout; VERIFRONT_HTTP_TIMEOUT_S overrides the 120s default.
+
+    Long code generations (e.g. 10KB steps on slow relays) need more than the
+    default; this is transport-only and does not change agent semantics.
+    """
+    try:
+        return float(os.environ.get("VERIFRONT_HTTP_TIMEOUT_S", "120"))
+    except ValueError:
+        return 120.0
+
+
 def client_from_config(cfg_path, arm: str = "frontier") -> OpenAICompatClient:
     """Build the OpenAI-compatible client for an arm from configs/models.yaml.
 
@@ -564,6 +576,7 @@ def client_from_config(cfg_path, arm: str = "frontier") -> OpenAICompatClient:
             base_url=os.environ.get(f.get("base_url_env") or "FRONTIER_BASE_URL", f.get("base_url") or ""),
             model=f["model_id"],
             api_key_env=f.get("api_key_env") or "FRONTIER_API_KEY",
+            timeout_s=_http_timeout_s(),
         )
         client.snapshot = f.get("snapshot") or ""
         return client
@@ -576,6 +589,7 @@ def client_from_config(cfg_path, arm: str = "frontier") -> OpenAICompatClient:
             base_url=entry["endpoint"],
             model=entry.get("model_id") or name,
             api_key_env=entry.get("api_key_env") or "LOCAL_MODEL_API_KEY",
+            timeout_s=_http_timeout_s(),
         )
         client.snapshot = entry.get("hf_revision") or ""
         return client
