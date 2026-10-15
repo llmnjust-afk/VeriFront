@@ -3,8 +3,8 @@
 
 ## T1 Run inventory decomposition (A1)
 
-- total result.json files: **818**
-- in-point (ready) runs: **705**; extras (parent not in point list): **113**
+- total result.json files: **1000**
+- in-point (ready) runs: **705**; extras (parent not in point list): **295**
 - per-arm in-point: ds 162, mini 214, qwen 130, resample 199
 - (point,arm) cells with n>2 (audit trail of补齐/复核): 84; max n = 34
 - status: {'completed': 695, 'budget_exhausted': 10}
